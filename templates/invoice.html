@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <h1>{{ shop }} — Invoice #{{ b.id }}</h1>
+  <p><strong>{{ b.customer }}</strong>, {{ b.phone }}<br>{{ b.address }}<br>
+  {{ b.event_type }}: {{ b.start_date }} to {{ b.end_date }} ({{ t.days }} day{{ 's' if t.days > 1 }})</p>
+  <table>
+    <tr><th>Item</th><th class="num">Qty</th><th class="num">Rate/day</th><th class="num">Amount</th></tr>
+    {% for l in t.lines %}
+    <tr><td>{{ l.name }}</td><td class="num">{{ l.qty }}</td><td class="num">{{ l.rate|money }}</td>
+        <td class="num">{{ (l.qty * l.rate * t.days)|money }}</td></tr>
+    {% endfor %}
+    <tr><td colspan="3" class="num">Rent</td><td class="num">{{ t.rent|money }}</td></tr>
+    <tr><td colspan="3" class="num">Discount</td><td class="num">-{{ t.discount|money }}</td></tr>
+    <tr><td colspan="3" class="num">Refundable deposit</td><td class="num">{{ t.deposit|money }}</td></tr>
+    <tr><th colspan="3" class="num">Total</th><th class="num">{{ t.total|money }}</th></tr>
+    <tr><td colspan="3" class="num">Paid</td><td class="num">{{ t.paid|money }}</td></tr>
+    <tr><th colspan="3" class="num">Balance</th><th class="num">{{ t.balance|money }}</th></tr>
+  </table>
+  <p><small>Deposit is refundable on return of items in good condition. Damaged or lost items will be charged.</small></p>
+  <button class="btn noprint" onclick="window.print()">Print</button>
+</div>
+{% endblock %}

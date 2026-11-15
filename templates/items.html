@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Inventory</h1>
+<p><a class="btn" href="{{ url_for('item_form') }}">+ Add item</a></p>
+<table>
+  <tr><th>Item</th><th>Category</th><th class="num">Total qty</th><th class="num">Rate / day</th><th class="num">Deposit</th><th></th></tr>
+  {% for i in items %}
+  <tr>
+    <td>{{ i.name }}</td><td>{{ i.category }}</td><td class="num">{{ i.total_qty }}</td>
+    <td class="num">{{ i.rate_per_day|money }}</td><td class="num">{{ i.deposit|money }}</td>
+    <td>
+      <a class="btn small" href="{{ url_for('item_form', item_id=i.id) }}">Edit</a>
+      <form class="inline" method="post" action="{{ url_for('item_delete', item_id=i.id) }}"
+            onsubmit="return confirm('Delete this item?')">
+        <button class="btn small danger">Delete</button></form>
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+{% endblock %}

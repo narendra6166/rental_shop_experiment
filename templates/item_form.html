@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>{{ 'Edit' if item_id else 'Add' }} item</h1>
+<form method="post" class="card">
+  <label>Name</label><input name="name" required value="{{ item.name if item else '' }}">
+  <label>Category (Tents, Cooking, Furniture...)</label>
+  <input name="category" required list="cats" value="{{ item.category if item else '' }}">
+  <datalist id="cats"><option>Tents</option><option>Cooking</option><option>Furniture</option><option>Decoration</option><option>Lighting</option></datalist>
+  <label>Total quantity</label><input type="number" min="0" name="total_qty" required value="{{ item.total_qty if item else '' }}">
+  <label>Rate per day (₹)</label><input type="number" min="0" step="0.01" name="rate_per_day" required value="{{ item.rate_per_day if item else '' }}">
+  <label>Refundable deposit per unit (₹)</label><input type="number" min="0" step="0.01" name="deposit" value="{{ item.deposit if item else 0 }}">
+  <p><button class="btn">Save</button> <a href="{{ url_for('items') }}">Cancel</a></p>
+</form>
+{% endblock %}

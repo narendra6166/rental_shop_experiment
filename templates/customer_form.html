@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Add customer</h1>
+<form method="post" class="card">
+  <label>Name</label><input name="name" required value="{{ c.get('name', '') }}">
+  <label>Phone</label><input name="phone" required value="{{ c.get('phone', '') }}">
+  <label>Address</label><textarea name="address">{{ c.get('address', '') }}</textarea>
+  <p><button class="btn">Save</button> <a href="{{ url_for('customers') }}">Cancel</a></p>
+</form>
+{% endblock %}

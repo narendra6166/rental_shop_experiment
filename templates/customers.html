@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Customers</h1>
+<form method="get"><input name="q" placeholder="Search name or phone" value="{{ q }}"> <button class="btn">Search</button>
+  <a class="btn" href="{{ url_for('customer_new') }}">+ Add customer</a></form><br>
+<table>
+  <tr><th>Name</th><th>Phone</th><th>Address</th><th></th></tr>
+  {% for c in customers %}
+  <tr><td>{{ c.name }}</td><td>{{ c.phone }}</td><td>{{ c.address }}</td>
+      <td><a class="btn small" href="{{ url_for('booking_new', customer_id=c.id) }}">Book</a></td></tr>
+  {% else %}
+  <tr><td colspan="4">No customers found.</td></tr>
+  {% endfor %}
+</table>
+{% endblock %}

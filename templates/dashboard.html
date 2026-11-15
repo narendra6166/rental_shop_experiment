@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Dashboard</h1>
+<div class="stats">
+  <div class="card">{{ stats.active }}<small>Active bookings</small></div>
+  <div class="card">{{ stats['items'] }}<small>Item types</small></div>
+  <div class="card">{{ stats.customers }}<small>Customers</small></div>
+</div>
+
+{% if overdue %}
+<h2>⚠ Overdue returns</h2>
+<table>
+  <tr><th>#</th><th>Customer</th><th>Event</th><th>Was due</th></tr>
+  {% for b in overdue %}
+  <tr><td><a href="{{ url_for('booking_view', booking_id=b.id) }}">{{ b.id }}</a></td>
+      <td>{{ b.customer }}</td><td>{{ b.event_type }}</td><td>{{ b.end_date }}</td></tr>
+  {% endfor %}
+</table>
+{% endif %}
+
+<h2>Upcoming / ongoing bookings</h2>
+<table>
+  <tr><th>#</th><th>Customer</th><th>Event</th><th>From</th><th>To</th><th>Status</th></tr>
+  {% for b in upcoming %}
+  <tr><td><a href="{{ url_for('booking_view', booking_id=b.id) }}">{{ b.id }}</a></td>
+      <td>{{ b.customer }}</td><td>{{ b.event_type }}</td>
+      <td>{{ b.start_date }}</td><td>{{ b.end_date }}</td><td><span class="badge">{{ b.status }}</span></td></tr>
+  {% else %}
+  <tr><td colspan="6">No upcoming bookings.</td></tr>
+  {% endfor %}
+</table>
+{% endblock %}
