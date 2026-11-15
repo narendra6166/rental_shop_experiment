@@ -2,23 +2,36 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{% block title %}Rental Shop{% endblock %}</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#3f43ff">
+<title>{% block page_title %}{{ shop_name }}{% endblock %}</title>
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-<nav>
-  <a class="brand" href="{{ url_for('dashboard') }}">⛺ Event Hire Shop</a>
-  <a href="{{ url_for('bookings') }}">Bookings</a>
-  <a href="{{ url_for('booking_new') }}">+ New Booking</a>
-  <a href="{{ url_for('items') }}">Inventory</a>
-  <a href="{{ url_for('customers') }}">Customers</a>
-</nav>
-<main>
+{% set ep = request.endpoint or '' %}
+{% block hero %}
+<header class="hero"><div class="wrap">
+  <div class="top">
+    {% block back %}<a class="back" href="javascript:history.back()">←</a>{% endblock %}
+    <div class="grow"><div class="title">{% block title %}{{ shop_name }}{% endblock %}</div>
+      {% block subtitle %}{% endblock %}</div>
+    {% block hero_action %}{% endblock %}
+  </div>
+</div></header>
+{% endblock %}
+<main class="wrap">
   {% for category, msg in get_flashed_messages(with_categories=true) %}
     <div class="flash {{ category }}">{{ msg }}</div>
   {% endfor %}
   {% block content %}{% endblock %}
 </main>
+{% block fab %}<a class="fab noprint" href="{{ url_for('booking_new') }}">＋ Booking</a>{% endblock %}
+<nav class="tabbar noprint">
+  <a href="{{ url_for('dashboard') }}" class="{{ 'on' if ep == 'dashboard' }}"><span>🏠</span>Home</a>
+  <a href="{{ url_for('bookings') }}" class="{{ 'on' if ep.startswith('booking') or ep == 'invoice' }}"><span>📋</span>Bookings</a>
+  <a href="{{ url_for('stock.stock') }}" class="{{ 'on' if ep.startswith('stock.') }}"><span>📦</span>Stock</a>
+  <a href="{{ url_for('staff.staff_list') }}" class="{{ 'on' if ep.startswith('staff.') or ep == 'staff.attendance' }}"><span>👥</span>Staff</a>
+  <a href="{{ url_for('more') }}" class="{{ 'on' if ep in ('more', 'items', 'item_form', 'customers', 'customer_new') }}"><span>☰</span>More</a>
+</nav>
 </body>
 </html>

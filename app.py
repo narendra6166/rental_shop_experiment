@@ -1,193 +1,98 @@
 import os
 import sqlite3
-from datetime import date, datetime
+import tempfile
+from datetime import date, datetime, timedelta
 
-from flask import Flask, flash, g, redirect, render_template, request, url_for
+from flask import Flask, flash, redirect, render_template, request, send_file, url_for
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.path.join(BASE_DIR, "rental.db")
-SHOP_NAME = "Event Hire Shop"
+import db as core
+from db import (EVENT_TYPES, PAYMENT_KINDS, STATUS_TABS, STATUSES, available_qty,
+                booking_totals, get_db, parse_date, status_info)
+from staff import staff_bp
+from stock import stock_bp
+
+SHOP_NAME = os.environ.get("SHOP_NAME", "Event Hire Shop")
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "change-me-in-production")
-
-SCHEMA = """
-CREATE TABLE IF NOT EXISTS items (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    category TEXT NOT NULL,
-    total_qty INTEGER NOT NULL CHECK (total_qty >= 0),
-    rate_per_day REAL NOT NULL CHECK (rate_per_day >= 0),
-    deposit REAL NOT NULL DEFAULT 0
-);
-CREATE TABLE IF NOT EXISTS customers (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    phone TEXT NOT NULL,
-    address TEXT
-);
-CREATE TABLE IF NOT EXISTS bookings (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    customer_id INTEGER NOT NULL REFERENCES customers(id),
-    event_type TEXT NOT NULL,
-    start_date TEXT NOT NULL,
-    end_date TEXT NOT NULL,
-    status TEXT NOT NULL DEFAULT 'Booked',
-    discount REAL NOT NULL DEFAULT 0,
-    notes TEXT,
-    created_at TEXT NOT NULL
-);
-CREATE TABLE IF NOT EXISTS booking_items (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    booking_id INTEGER NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
-    item_id INTEGER NOT NULL REFERENCES items(id),
-    qty INTEGER NOT NULL CHECK (qty > 0),
-    rate REAL NOT NULL,
-    deposit REAL NOT NULL DEFAULT 0
-);
-CREATE TABLE IF NOT EXISTS payments (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    booking_id INTEGER NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
-    amount REAL NOT NULL,
-    kind TEXT NOT NULL,
-    paid_on TEXT NOT NULL
-);
-"""
-
-SAMPLE_ITEMS = [
-    ("Tent 10x10 ft", "Tents", 20, 500, 1000),
-    ("Shamiana (Large)", "Tents", 5, 3000, 5000),
-    ("Gas Stove (2 burner)", "Cooking", 10, 150, 500),
-    ("Big Cooking Vessel (Deg)", "Cooking", 15, 200, 500),
-    ("Gas Cylinder Stand + Burner", "Cooking", 8, 250, 800),
-    ("Plastic Chair", "Furniture", 300, 5, 0),
-    ("Round Table", "Furniture", 40, 60, 200),
-    ("Stage Decoration Set", "Decoration", 4, 2500, 3000),
-]
-
-EVENT_TYPES = ["Marriage", "Birthday", "Engagement", "Housewarming", "Party", "Other"]
-STATUSES = ["Booked", "Delivered", "Returned", "Cancelled"]
-PAYMENT_KINDS = ["Advance", "Payment", "Deposit refund"]
+app.teardown_appcontext(core.close_db)
+app.register_blueprint(staff_bp)
+app.register_blueprint(stock_bp)
+app.jinja_env.globals.update(status_info=status_info, shop_name=SHOP_NAME, today=date.today,
+                           timedelta=timedelta)
 
 
-def get_db():
-    if "db" not in g:
-        g.db = sqlite3.connect(DB_PATH)
-        g.db.row_factory = sqlite3.Row
-        g.db.execute("PRAGMA foreign_keys = ON")
-    return g.db
+@app.template_filter("money")
+def money(v):
+    v = v or 0
+    return f"₹{v:,.0f}" if float(v).is_integer() else f"₹{v:,.2f}"
 
 
-@app.teardown_appcontext
-def close_db(_exc):
-    db = g.pop("db", None)
-    if db is not None:
-        db.close()
+@app.template_filter("dmy")
+def dmy(v):
+    d = parse_date(v)
+    return d.strftime("%d %b") if d else v
 
 
-def init_db():
-    db = sqlite3.connect(DB_PATH)
-    db.executescript(SCHEMA)
-    if db.execute("SELECT COUNT(*) FROM items").fetchone()[0] == 0:
-        db.executemany(
-            "INSERT INTO items (name, category, total_qty, rate_per_day, deposit) VALUES (?,?,?,?,?)",
-            SAMPLE_ITEMS,
-        )
-    db.commit()
-    db.close()
-
-
-def parse_date(value):
-    try:
-        return datetime.strptime(value, "%Y-%m-%d").date()
-    except (TypeError, ValueError):
-        return None
-
-
-def rental_days(start, end):
-    return (end - start).days + 1
-
-
-def booked_qty(db, item_id, start, end, exclude_booking=None):
-    """Max units of an item reserved on any single day within [start, end]."""
-    rows = db.execute(
-        """SELECT b.start_date, b.end_date, bi.qty FROM booking_items bi
-           JOIN bookings b ON b.id = bi.booking_id
-           WHERE bi.item_id = ? AND b.status IN ('Booked', 'Delivered')
-             AND b.start_date <= ? AND b.end_date >= ? AND b.id IS NOT ?""",
-        (item_id, end, start, exclude_booking),
+def booking_rows(where="", args=()):
+    return get_db().execute(
+        f"""SELECT b.*, c.name AS customer, c.phone FROM bookings b
+            JOIN customers c ON c.id = b.customer_id {where}
+            ORDER BY b.start_date""",
+        args,
     ).fetchall()
-    peak = 0
-    day = parse_date(start)
-    last = parse_date(end)
-    while day <= last:
-        d = day.isoformat()
-        used = sum(r["qty"] for r in rows if r["start_date"] <= d <= r["end_date"])
-        peak = max(peak, used)
-        day = date.fromordinal(day.toordinal() + 1)
-    return peak
-
-
-def available_qty(db, item, start, end):
-    return item["total_qty"] - booked_qty(db, item["id"], start, end)
-
-
-def booking_totals(db, booking_id):
-    b = db.execute("SELECT * FROM bookings WHERE id = ?", (booking_id,)).fetchone()
-    days = rental_days(parse_date(b["start_date"]), parse_date(b["end_date"]))
-    lines = db.execute(
-        """SELECT bi.*, i.name FROM booking_items bi
-           JOIN items i ON i.id = bi.item_id WHERE bi.booking_id = ?""",
-        (booking_id,),
-    ).fetchall()
-    rent = sum(l["qty"] * l["rate"] * days for l in lines)
-    deposit = sum(l["qty"] * l["deposit"] for l in lines)
-    payments = db.execute(
-        "SELECT * FROM payments WHERE booking_id = ? ORDER BY id", (booking_id,)
-    ).fetchall()
-    rent_paid = sum(p["amount"] for p in payments if p["kind"] != "Deposit refund")
-    refunded = sum(p["amount"] for p in payments if p["kind"] == "Deposit refund")
-    rent_due = max(rent - b["discount"], 0)
-    return {
-        "days": days,
-        "lines": lines,
-        "rent": rent,
-        "discount": b["discount"],
-        "net_rent": rent_due,
-        "deposit": deposit,
-        "total": rent_due + deposit,
-        "paid": rent_paid,
-        "refunded": refunded,
-        "balance": rent_due + deposit - rent_paid,
-        "payments": payments,
-    }
 
 
 @app.route("/")
 def dashboard():
     db = get_db()
-    today = date.today().isoformat()
+    month = date.today().strftime("%Y-%m")
+    active = [b for b in booking_rows() if b["status"] not in ("Cancelled", "Returned")]
+    by_key = {}
+    for b in active:
+        by_key.setdefault(status_info(b)[2], []).append(b)
+    needs_action = by_key.get("pending", []) + by_key.get("today", []) + by_key.get("overdue", [])
+    soon = by_key.get("soon", [])
+    on_work = by_key.get("onwork", [])
+    balance_due = sum(max(booking_totals(db, b["id"])["balance"], 0) for b in active)
     stats = {
-        "items": db.execute("SELECT COUNT(*) FROM items").fetchone()[0],
-        "customers": db.execute("SELECT COUNT(*) FROM customers").fetchone()[0],
-        "active": db.execute(
-            "SELECT COUNT(*) FROM bookings WHERE status IN ('Booked','Delivered')"
+        "soon": len(soon) + len(by_key.get("today", [])) + len(by_key.get("pending", [])),
+        "on_work": len(on_work) + len(by_key.get("overdue", [])),
+        "balance": balance_due,
+        "collected": db.execute(
+            """SELECT COALESCE(SUM(CASE WHEN kind='Deposit refund' THEN -amount ELSE amount END), 0)
+               FROM payments WHERE substr(paid_on,1,7) = ?""",
+            (month,),
+        ).fetchone()[0],
+        "open_damages": db.execute(
+            "SELECT COALESCE(SUM(qty),0) FROM damages WHERE status='Open'"
+        ).fetchone()[0],
+        "staff_total": db.execute("SELECT COUNT(*) FROM staff WHERE active=1").fetchone()[0],
+        "staff_present": db.execute(
+            """SELECT COUNT(*) FROM attendance a JOIN staff s ON s.id=a.staff_id
+               WHERE a.day=? AND a.status IN ('Present','Half') AND s.active=1""",
+            (date.today().isoformat(),),
         ).fetchone()[0],
     }
-    upcoming = db.execute(
-        """SELECT b.*, c.name AS customer FROM bookings b
-           JOIN customers c ON c.id = b.customer_id
-           WHERE b.status IN ('Booked','Delivered') AND b.end_date >= ?
-           ORDER BY b.start_date LIMIT 10""",
-        (today,),
-    ).fetchall()
-    overdue = db.execute(
-        """SELECT b.*, c.name AS customer FROM bookings b
-           JOIN customers c ON c.id = b.customer_id
-           WHERE b.status = 'Delivered' AND b.end_date < ? ORDER BY b.end_date""",
-        (today,),
-    ).fetchall()
-    return render_template("dashboard.html", stats=stats, upcoming=upcoming, overdue=overdue)
+    return render_template("dashboard.html", stats=stats, needs_action=needs_action,
+                           soon=soon, on_work=on_work)
+
+
+@app.route("/more")
+def more():
+    return render_template("more.html")
+
+
+@app.route("/backup")
+def backup():
+    src = get_db()
+    tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
+    tmp.close()
+    dest = sqlite3.connect(tmp.name)
+    src.backup(dest)
+    dest.close()
+    name = f"rental-backup-{datetime.now():%Y%m%d-%H%M}.db"
+    return send_file(tmp.name, as_attachment=True, download_name=name)
 
 
 # ---------- Items ----------
@@ -242,7 +147,7 @@ def item_delete(item_id):
         db.commit()
         flash("Item deleted.", "ok")
     except sqlite3.IntegrityError:
-        flash("Item is used in bookings and cannot be deleted.", "error")
+        flash("Item is used in bookings or damage records and cannot be deleted.", "error")
     return redirect(url_for("items"))
 
 
@@ -250,8 +155,7 @@ def item_delete(item_id):
 @app.route("/customers")
 def customers():
     q = request.args.get("q", "").strip()
-    db = get_db()
-    rows = db.execute(
+    rows = get_db().execute(
         "SELECT * FROM customers WHERE name LIKE ? OR phone LIKE ? ORDER BY name",
         (f"%{q}%", f"%{q}%"),
     ).fetchall()
@@ -273,8 +177,7 @@ def customer_new():
         )
         db.commit()
         flash("Customer added.", "ok")
-        nxt = request.args.get("next")
-        if nxt == "booking":
+        if request.args.get("next") == "booking":
             return redirect(url_for("booking_new", customer_id=cur.lastrowid))
         return redirect(url_for("customers"))
     return render_template("customer_form.html", c={})
@@ -283,15 +186,27 @@ def customer_new():
 # ---------- Bookings ----------
 @app.route("/bookings")
 def bookings():
-    status = request.args.get("status", "")
-    sql = """SELECT b.*, c.name AS customer, c.phone FROM bookings b
-             JOIN customers c ON c.id = b.customer_id"""
-    args = ()
-    if status in STATUSES:
-        sql += " WHERE b.status = ?"
-        args = (status,)
-    rows = get_db().execute(sql + " ORDER BY b.start_date DESC", args).fetchall()
-    return render_template("bookings.html", bookings=rows, statuses=STATUSES, status=status)
+    tab = request.args.get("tab", "all")
+    q = request.args.get("q", "").strip().lower()
+    keys = {t[0]: t[2] for t in STATUS_TABS}.get(tab)
+    rows = booking_rows()
+    counts = {t[0]: 0 for t in STATUS_TABS}
+    shown = []
+    for b in rows:
+        key = status_info(b)[2]
+        counts["all"] += 1
+        for t in STATUS_TABS[1:]:
+            if key in t[2]:
+                counts[t[0]] += 1
+        if keys and key not in keys:
+            continue
+        if q and q not in f"{b['customer']} {b['phone']} {b['id']} {b['event_type']}".lower():
+            continue
+        shown.append(b)
+    # Active work first, finished ones last
+    shown.sort(key=lambda b: (status_info(b)[2] in ("done", "cancelled"), b["start_date"]))
+    return render_template("bookings.html", bookings=shown, tabs=STATUS_TABS,
+                           tab=tab, counts=counts, q=q)
 
 
 @app.route("/bookings/new", methods=["GET", "POST"])
@@ -362,39 +277,33 @@ def booking_new():
             flash("Booking created.", "ok")
             return redirect(url_for("booking_view", booking_id=bid))
 
-    return render_template(
-        "booking_form.html", customers=custs, items=all_items, avail=avail,
-        form=form, event_types=EVENT_TYPES,
-    )
+    return render_template("booking_form.html", customers=custs, items=all_items, avail=avail,
+                           form=form, event_types=EVENT_TYPES)
+
+
+def load_booking(booking_id):
+    return get_db().execute(
+        """SELECT b.*, c.name AS customer, c.phone, c.address FROM bookings b
+           JOIN customers c ON c.id = b.customer_id WHERE b.id = ?""",
+        (booking_id,),
+    ).fetchone()
 
 
 @app.route("/bookings/<int:booking_id>")
 def booking_view(booking_id):
-    db = get_db()
-    b = db.execute(
-        """SELECT b.*, c.name AS customer, c.phone, c.address FROM bookings b
-           JOIN customers c ON c.id = b.customer_id WHERE b.id = ?""",
-        (booking_id,),
-    ).fetchone()
+    b = load_booking(booking_id)
     if not b:
         return redirect(url_for("bookings"))
-    return render_template(
-        "booking_view.html", b=b, t=booking_totals(db, booking_id),
-        statuses=STATUSES, kinds=PAYMENT_KINDS,
-    )
+    return render_template("booking_view.html", b=b, t=booking_totals(get_db(), booking_id),
+                           kinds=PAYMENT_KINDS)
 
 
 @app.route("/bookings/<int:booking_id>/invoice")
 def invoice(booking_id):
-    db = get_db()
-    b = db.execute(
-        """SELECT b.*, c.name AS customer, c.phone, c.address FROM bookings b
-           JOIN customers c ON c.id = b.customer_id WHERE b.id = ?""",
-        (booking_id,),
-    ).fetchone()
+    b = load_booking(booking_id)
     if not b:
         return redirect(url_for("bookings"))
-    return render_template("invoice.html", b=b, t=booking_totals(db, booking_id), shop=SHOP_NAME)
+    return render_template("invoice.html", b=b, t=booking_totals(get_db(), booking_id))
 
 
 @app.route("/bookings/<int:booking_id>/status", methods=["POST"])
@@ -404,7 +313,9 @@ def booking_status(booking_id):
         db = get_db()
         db.execute("UPDATE bookings SET status = ? WHERE id = ?", (status, booking_id))
         db.commit()
-        flash(f"Status changed to {status}.", "ok")
+        flash("Booking updated.", "ok")
+        if status == "Returned":
+            flash("Items back? Report any damaged or lost items below.", "ok")
     return redirect(url_for("booking_view", booking_id=booking_id))
 
 
@@ -439,12 +350,7 @@ def booking_delete(booking_id):
     return redirect(url_for("bookings"))
 
 
-@app.template_filter("money")
-def money(v):
-    return f"₹{v:,.2f}"
-
-
-init_db()
+core.init_db()
 
 if __name__ == "__main__":
-    app.run(debug=os.environ.get("FLASK_DEBUG") == "1")
+    app.run(host=os.environ.get("HOST", "127.0.0.1"), debug=os.environ.get("FLASK_DEBUG") == "1")

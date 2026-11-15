@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% from "_macros.html" import empty %}
+{% block title %}Attendance{% endblock %}
+{% block subtitle %}<small>{{ day.strftime('%A, %d %B %Y') }}</small>{% endblock %}
+{% block fab %}{% endblock %}
+{% block content %}
+{% set prev = (day - timedelta(days=1)).isoformat() %}
+{% set nxt = (day + timedelta(days=1)).isoformat() %}
+<div class="row between" style="margin-bottom:12px">
+  <a class="btn light sm" href="{{ url_for('staff.attendance', day=prev) }}">‹ Prev</a>
+  <a class="btn light sm" href="{{ url_for('staff.attendance') }}">Today</a>
+  <a class="btn light sm" href="{{ url_for('staff.attendance', day=nxt) }}">Next ›</a>
+</div>
+{% if people %}
+<form method="post" action="{{ url_for('staff.attendance_mark') }}" style="margin-bottom:12px">
+  <input type="hidden" name="day" value="{{ day.isoformat() }}"><input type="hidden" name="staff_id" value="all">
+  <button class="btn green block" name="status" value="Present">Mark everyone present</button>
+</form>
+{% endif %}
+{% for p in people %}
+<div class="card">
+  <div class="row"><div class="avatar">{{ p.name[:1]|upper }}</div><div class="grow"><strong>{{ p.name }}</strong><div class="muted">{{ p.role }}</div></div></div>
+  <form method="post" action="{{ url_for('staff.attendance_mark') }}" class="seg">
+    <input type="hidden" name="day" value="{{ day.isoformat() }}"><input type="hidden" name="staff_id" value="{{ p.id }}">
+    {% for s in statuses %}
+    <button name="status" value="{{ s }}" class="{{ 'on-' ~ s if marked.get(p.id) == s }}">{{ 'Half day' if s == 'Half' else s }}</button>
+    {% endfor %}
+  </form>
+</div>
+{% else %}{{ empty('👷', 'Add staff first') }}{% endfor %}
+{% endblock %}

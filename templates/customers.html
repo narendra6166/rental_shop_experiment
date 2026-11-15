@@ -1,15 +1,15 @@
 {% extends "base.html" %}
+{% from "_macros.html" import empty %}
+{% block title %}Customers{% endblock %}
+{% block fab %}<a class="fab noprint" href="{{ url_for('customer_new') }}">＋ Customer</a>{% endblock %}
 {% block content %}
-<h1>Customers</h1>
-<form method="get"><input name="q" placeholder="Search name or phone" value="{{ q }}"> <button class="btn">Search</button>
-  <a class="btn" href="{{ url_for('customer_new') }}">+ Add customer</a></form><br>
-<table>
-  <tr><th>Name</th><th>Phone</th><th>Address</th><th></th></tr>
-  {% for c in customers %}
-  <tr><td>{{ c.name }}</td><td>{{ c.phone }}</td><td>{{ c.address }}</td>
-      <td><a class="btn small" href="{{ url_for('booking_new', customer_id=c.id) }}">Book</a></td></tr>
-  {% else %}
-  <tr><td colspan="4">No customers found.</td></tr>
-  {% endfor %}
-</table>
+<form class="search" style="margin-top:0" method="get"><input name="q" placeholder="Search name or phone" value="{{ q }}"><button>🔍</button></form>
+<div style="height:12px"></div>
+{% for c in customers %}
+<div class="card row">
+  <div class="avatar">{{ c.name[:1]|upper }}</div>
+  <div class="grow"><strong>{{ c.name }}</strong><div class="muted">{{ c.phone }}{% if c.address %} · {{ c.address }}{% endif %}</div></div>
+  <a class="btn light sm" href="{{ url_for('booking_new', customer_id=c.id) }}">Book</a>
+</div>
+{% else %}{{ empty('🧑', 'No customers found') }}{% endfor %}
 {% endblock %}

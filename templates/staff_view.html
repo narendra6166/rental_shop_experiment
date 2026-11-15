@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}{{ p.name }}{% endblock %}
+{% block subtitle %}<small>{{ p.role }}{% if p.phone %} · {{ p.phone }}{% endif %}</small>{% endblock %}
+{% block hero_action %}<a class="circle" href="{{ url_for('staff.staff_form', staff_id=p.id) }}">✏️</a>{% endblock %}
+{% block fab %}{% endblock %}
+{% block content %}
+<div class="row between" style="margin-bottom:12px">
+  <a class="btn light sm" href="{{ url_for('staff.staff_view', staff_id=p.id, month=prev_month) }}">‹</a>
+  <strong>{{ month }}</strong>
+  <a class="btn light sm" href="{{ url_for('staff.staff_view', staff_id=p.id, month=next_month) }}">›</a>
+</div>
+
+<div class="stats">
+  <div class="stat hl"><b>{{ s.due|money }}</b><span>Salary due</span></div>
+  <div class="stat"><b>{{ s.earned|money }}</b><span>Earned ({{ s.paid_days|round(1) }} of {{ s.days_in_month }} days)</span></div>
+  <div class="stat"><b>{{ s.paid|money }}</b><span>Paid / advance</span></div>
+  <div class="stat"><b>{{ p.monthly_salary|money }}</b><span>Monthly salary</span></div>
+</div>
+
+<div class="section"><h2>Attendance</h2><a href="{{ url_for('staff.attendance') }}">Mark</a></div>
+<div class="card">
+  <div class="row wrapflex">
+    <span class="pill green">Present {{ s.counts.Present }}</span><span class="pill orange">Half {{ s.counts.Half }}</span>
+    <span class="pill red">Absent {{ s.counts.Absent }}</span><span class="pill purple">Leave {{ s.counts.Leave }}</span>
+  </div>
+  <div class="dots">
+    {% for d in range(1, s.days_in_month + 1) %}
+    {% set key = month ~ '-' ~ ('%02d' % d) %}
+    <div class="dot {{ days.get(key, '') }}">{{ d }}</div>
+    {% endfor %}
+  </div>
+  <div class="muted mt">{{ s.days_in_month - s.marked }} days not marked. Leave counts as paid.</div>
+</div>
+
+<div class="section"><h2>Payments</h2></div>
+<div class="card">
+  {% for pay in s.payments %}
+  <div class="row between" style="padding:6px 0">
+    <div><b>{{ pay.kind }}</b> · {{ pay.paid_on|dmy }}{% if pay.note %}<div class="muted">{{ pay.note }}</div>{% endif %}</div>
+    <div class="row"><b>{{ pay.amount|money }}</b>
+      <form class="inline" method="post" action="{{ url_for('staff.staff_pay_delete', staff_id=p.id, pay_id=pay.id) }}" onsubmit="return confirm('Remove this payment?')"><button class="btn danger sm">✕</button></form></div>
+  </div>
+  {% else %}<div class="muted">No payments this month</div>{% endfor %}
+  <form method="post" action="{{ url_for('staff.staff_pay', staff_id=p.id) }}" class="mt">
+    <input type="hidden" name="month" value="{{ month }}">
+    <div class="grid2">
+      <input type="number" inputmode="decimal" name="amount" min="1" step="1" placeholder="Amount ₹" required value="{{ s.due|round(0)|int if s.due > 0 else '' }}">
+      <select name="kind">{% for k in kinds %}<option>{{ k }}</option>{% endfor %}</select>
+    </div>
+    <input name="note" placeholder="Note (optional)" class="mt">
+    <button class="btn block mt">Record payment</button>
+  </form>
+</div>
+{% endblock %}

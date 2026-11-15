@@ -1,44 +1,44 @@
 {% extends "base.html" %}
+{% block title %}New booking{% endblock %}
+{% block fab %}{% endblock %}
 {% block content %}
-<h1>New booking</h1>
-<form method="post" class="card">
-  <label>Customer</label>
-  <select name="customer_id" required>
-    <option value="">-- select --</option>
-    {% for c in customers %}
-    <option value="{{ c.id }}" {{ 'selected' if form.get('customer_id')|string == c.id|string }}>{{ c.name }} ({{ c.phone }})</option>
-    {% endfor %}
-  </select>
-  <a href="{{ url_for('customer_new', next='booking') }}">+ new customer</a>
-
-  <label>Event type</label>
-  <select name="event_type">
-    {% for e in event_types %}<option {{ 'selected' if form.get('event_type') == e }}>{{ e }}</option>{% endfor %}
-  </select>
-
-  <div class="row">
-    <div><label>Start date</label><input type="date" name="start_date" required value="{{ form.get('start_date', '') }}"></div>
-    <div><label>End date</label><input type="date" name="end_date" required value="{{ form.get('end_date', '') }}"></div>
+<form method="post">
+  <div class="card">
+    <label style="margin-top:0">Customer</label>
+    <select name="customer_id" required>
+      <option value="">Select customer</option>
+      {% for c in customers %}
+      <option value="{{ c.id }}" {{ 'selected' if form.get('customer_id')|string == c.id|string }}>{{ c.name }} ({{ c.phone }})</option>
+      {% endfor %}
+    </select>
+    <p style="margin:8px 0 0"><a class="muted" style="color:var(--primary);font-weight:700" href="{{ url_for('customer_new', next='booking') }}">＋ New customer</a></p>
+    <label>Event type</label>
+    <select name="event_type">{% for e in event_types %}<option {{ 'selected' if form.get('event_type') == e }}>{{ e }}</option>{% endfor %}</select>
+    <div class="grid2">
+      <div><label>Start date</label><input type="date" name="start_date" required value="{{ form.get('start_date', '') }}"></div>
+      <div><label>End date</label><input type="date" name="end_date" required value="{{ form.get('end_date', '') }}"></div>
+    </div>
+    <button class="btn light block mt" type="submit" formmethod="get" formaction="{{ url_for('booking_new') }}">Check stock for these dates</button>
   </div>
-  <p class="noprint"><button class="btn small" type="submit" formmethod="get" formaction="{{ url_for('booking_new') }}">Check availability</button>
-     <small>Pick dates, then check availability to see free stock.</small></p>
 
-  <h2>Items</h2>
-  <table>
-    <tr><th>Item</th><th class="num">Rate/day</th><th class="num">Available</th><th>Qty</th></tr>
+  <div class="section"><h2>Items</h2>{% if not avail %}<span class="muted">Pick dates to see availability</span>{% endif %}</div>
+  <div class="card">
     {% for i in items %}
-    <tr><td>{{ i.name }} <small>({{ i.category }})</small></td>
-        <td class="num">{{ i.rate_per_day|money }}</td>
-        <td class="num">{{ avail[i.id] if avail else '—' }}</td>
-        <td><input type="number" min="0" name="qty_{{ i.id }}" value="{{ form.get('qty_' ~ i.id, '') }}"></td></tr>
+    <div class="item">
+      <div class="grow"><strong>{{ i.name }}</strong>
+        <div class="muted">{{ i.rate_per_day|money }}/day{% if avail %} · <b style="color:{{ 'var(--red)' if avail[i.id] <= 0 else 'var(--green)' }}">{{ avail[i.id] }} free</b>{% endif %}</div></div>
+      <input class="qty" type="number" inputmode="numeric" min="0" placeholder="Qty" name="qty_{{ i.id }}" value="{{ form.get('qty_' ~ i.id, '') }}">
+    </div>
     {% endfor %}
-  </table>
-
-  <div class="row">
-    <div><label>Discount (₹)</label><input type="number" min="0" step="0.01" name="discount" value="{{ form.get('discount', 0) }}"></div>
-    <div><label>Advance paid (₹)</label><input type="number" min="0" step="0.01" name="advance" value="{{ form.get('advance', 0) }}"></div>
   </div>
-  <label>Notes (venue, delivery time...)</label><textarea name="notes">{{ form.get('notes', '') }}</textarea>
-  <p><button class="btn">Create booking</button></p>
+
+  <div class="card">
+    <div class="grid2">
+      <div><label style="margin-top:0">Discount (₹)</label><input type="number" inputmode="decimal" min="0" step="0.01" name="discount" value="{{ form.get('discount', 0) }}"></div>
+      <div><label style="margin-top:0">Advance paid (₹)</label><input type="number" inputmode="decimal" min="0" step="0.01" name="advance" value="{{ form.get('advance', 0) }}"></div>
+    </div>
+    <label>Notes (venue, delivery time...)</label><textarea name="notes" rows="2">{{ form.get('notes', '') }}</textarea>
+  </div>
+  <button class="btn block">Create booking</button>
 </form>
 {% endblock %}

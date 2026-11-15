@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block back %}{% endblock %}
+{% block title %}More{% endblock %}
+{% block content %}
+<a class="card row" href="{{ url_for('items') }}"><span style="font-size:1.6rem">🏷️</span><div class="grow"><strong>Inventory &amp; prices</strong><div class="muted">Add or edit items, rates, deposits</div></div>›</a>
+<a class="card row" href="{{ url_for('customers') }}"><span style="font-size:1.6rem">🧑‍🤝‍🧑</span><div class="grow"><strong>Customers</strong><div class="muted">Search and add customers</div></div>›</a>
+<a class="card row" href="{{ url_for('stock.damages') }}"><span style="font-size:1.6rem">🛠️</span><div class="grow"><strong>Damaged &amp; lost items</strong><div class="muted">Repairs, write-offs, charges</div></div>›</a>
+<a class="card row" href="{{ url_for('staff.attendance') }}"><span style="font-size:1.6rem">✅</span><div class="grow"><strong>Attendance</strong><div class="muted">Mark staff present / absent</div></div>›</a>
+<a class="card row" href="{{ url_for('staff.staff_list') }}"><span style="font-size:1.6rem">💰</span><div class="grow"><strong>Staff &amp; salaries</strong><div class="muted">Salary due, advances, payments</div></div>›</a>
+<a class="card row" href="{{ url_for('backup') }}"><span style="font-size:1.6rem">💾</span><div class="grow"><strong>Download backup</strong><div class="muted">Save all your data as a file</div></div>›</a>
+{% endblock %}

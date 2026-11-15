@@ -1,32 +1,52 @@
 {% extends "base.html" %}
+{% from "_macros.html" import booking_card, empty %}
+{% block hero %}
+<header class="hero tall"><div class="wrap">
+  <div class="top">
+    <div class="grow">
+      <small>📅 {{ today().strftime('%A, %d %B') }}</small>
+      <div class="title">{{ shop_name }}</div>
+    </div>
+    <a class="circle" href="{{ url_for('more') }}">☰</a>
+  </div>
+  <div class="big">Everything<br>for your event.</div>
+</div></header>
+<div class="wrap">
+  <form class="search" action="{{ url_for('bookings') }}">
+    <input name="q" placeholder="Search customer, phone, booking #">
+    <button>🔍</button>
+  </form>
+</div>
+{% endblock %}
 {% block content %}
-<h1>Dashboard</h1>
-<div class="stats">
-  <div class="card">{{ stats.active }}<small>Active bookings</small></div>
-  <div class="card">{{ stats['items'] }}<small>Item types</small></div>
-  <div class="card">{{ stats.customers }}<small>Customers</small></div>
+<div class="tiles">
+  <a class="tile big t-peach" href="{{ url_for('bookings', tab='soon') }}">
+    <div>Bookings<div class="count">{{ stats.soon }} starting soon</div></div><span class="emoji">🎪</span></a>
+  <a class="tile big t-green" href="{{ url_for('stock.stock') }}">
+    <div>Stock<div class="count">Check availability</div></div><span class="emoji">⛺</span></a>
+  <a class="tile small t-blue" href="{{ url_for('staff.staff_list') }}">
+    <div>Staff<div class="count">{{ stats.staff_present }}/{{ stats.staff_total }} in today</div></div><span class="emoji">👷</span></a>
+  <a class="tile small t-lilac" href="{{ url_for('stock.damages') }}">
+    <div>Damaged<div class="count">{{ stats.open_damages }} units</div></div><span class="emoji">🛠️</span></a>
+  <a class="tile small t-yellow" href="{{ url_for('staff.attendance') }}">
+    <div>Attendance<div class="count">Mark today</div></div><span class="emoji">✅</span></a>
 </div>
 
-{% if overdue %}
-<h2>⚠ Overdue returns</h2>
-<table>
-  <tr><th>#</th><th>Customer</th><th>Event</th><th>Was due</th></tr>
-  {% for b in overdue %}
-  <tr><td><a href="{{ url_for('booking_view', booking_id=b.id) }}">{{ b.id }}</a></td>
-      <td>{{ b.customer }}</td><td>{{ b.event_type }}</td><td>{{ b.end_date }}</td></tr>
-  {% endfor %}
-</table>
+<div class="stats mt" style="margin-top:16px">
+  <div class="stat hl"><b>{{ stats.on_work }}</b><span>On work now</span></div>
+  <div class="stat"><b>{{ stats.balance|money }}</b><span>Balance to collect</span></div>
+  <div class="stat"><b>{{ stats.collected|money }}</b><span>Collected this month</span></div>
+  <div class="stat"><b>{{ stats.soon }}</b><span>Starting soon</span></div>
+</div>
+
+{% if needs_action %}
+<div class="section"><h2>⚠️ Needs action</h2></div>
+{% for b in needs_action %}{{ booking_card(b) }}{% endfor %}
 {% endif %}
 
-<h2>Upcoming / ongoing bookings</h2>
-<table>
-  <tr><th>#</th><th>Customer</th><th>Event</th><th>From</th><th>To</th><th>Status</th></tr>
-  {% for b in upcoming %}
-  <tr><td><a href="{{ url_for('booking_view', booking_id=b.id) }}">{{ b.id }}</a></td>
-      <td>{{ b.customer }}</td><td>{{ b.event_type }}</td>
-      <td>{{ b.start_date }}</td><td>{{ b.end_date }}</td><td><span class="badge">{{ b.status }}</span></td></tr>
-  {% else %}
-  <tr><td colspan="6">No upcoming bookings.</td></tr>
-  {% endfor %}
-</table>
+<div class="section"><h2>Starting soon</h2><a href="{{ url_for('bookings', tab='soon') }}">See all</a></div>
+{% for b in soon %}{{ booking_card(b) }}{% else %}{{ empty('🗓️', 'Nothing starting in the next 3 days') }}{% endfor %}
+
+<div class="section"><h2>On work</h2><a href="{{ url_for('bookings', tab='onwork') }}">See all</a></div>
+{% for b in on_work %}{{ booking_card(b) }}{% else %}{{ empty('🚚', 'No events running right now') }}{% endfor %}
 {% endblock %}

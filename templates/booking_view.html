@@ -1,42 +1,80 @@
 {% extends "base.html" %}
+{% from "_macros.html" import pill %}
+{% block title %}Booking #{{ b.id }}{% endblock %}
+{% block subtitle %}<small>{{ b.customer }}</small>{% endblock %}
+{% block hero_action %}{{ pill(b) }}{% endblock %}
+{% block fab %}{% endblock %}
 {% block content %}
-<h1>Booking #{{ b.id }} <span class="badge">{{ b.status }}</span></h1>
+{% set key = status_info(b)[2] %}
 <div class="card">
-  <strong>{{ b.customer }}</strong> — {{ b.phone }}<br>{{ b.address }}<br>
-  {{ b.event_type }}: {{ b.start_date }} to {{ b.end_date }} ({{ t.days }} day{{ 's' if t.days > 1 }})<br>
-  {% if b.notes %}Notes: {{ b.notes }}{% endif %}
+  <strong>{{ b.customer }}</strong>
+  <div class="row mt wrapflex">
+    <a class="btn light sm" href="tel:{{ b.phone }}">📞 {{ b.phone }}</a>
+    <a class="btn light sm" href="https://wa.me/{{ b.phone|replace('+','')|replace(' ','') }}" target="_blank">💬 WhatsApp</a>
+  </div>
+  {% if b.address %}<div class="muted mt">📍 {{ b.address }}</div>{% endif %}
+  <div class="muted mt">🎉 {{ b.event_type }} · {{ b.start_date|dmy }} → {{ b.end_date|dmy }} ({{ t.days }} day{{ 's' if t.days > 1 }})</div>
+  {% if b.notes %}<div class="muted mt">📝 {{ b.notes }}</div>{% endif %}
 </div>
 
-<table>
-  <tr><th>Item</th><th class="num">Qty</th><th class="num">Rate/day</th><th class="num">Days</th><th class="num">Rent</th><th class="num">Deposit</th></tr>
-  {% for l in t.lines %}
-  <tr><td>{{ l.name }}</td><td class="num">{{ l.qty }}</td><td class="num">{{ l.rate|money }}</td>
-      <td class="num">{{ t.days }}</td><td class="num">{{ (l.qty * l.rate * t.days)|money }}</td>
-      <td class="num">{{ (l.qty * l.deposit)|money }}</td></tr>
-  {% endfor %}
-  <tr><td colspan="4" class="num">Rent</td><td class="num">{{ t.rent|money }}</td><td></td></tr>
-  <tr><td colspan="4" class="num">Discount</td><td class="num">-{{ t.discount|money }}</td><td></td></tr>
-  <tr><td colspan="5" class="num">Refundable deposit</td><td class="num">{{ t.deposit|money }}</td></tr>
-  <tr><th colspan="5" class="num">Total payable</th><th class="num">{{ t.total|money }}</th></tr>
-  <tr><td colspan="5" class="num">Paid</td><td class="num">{{ t.paid|money }}</td></tr>
-  <tr><th colspan="5" class="num">Balance due</th><th class="num">{{ t.balance|money }}</th></tr>
-</table>
+<div class="card">
+  <div class="muted" style="margin-bottom:8px">Update progress</div>
+  <div class="grid2">
+    {% if b.status == 'Booked' %}
+      <form method="post" action="{{ url_for('booking_status', booking_id=b.id) }}"><input type="hidden" name="status" value="Delivered"><button class="btn block">🚚 Start work</button></form>
+    {% elif b.status == 'Delivered' %}
+      <form method="post" action="{{ url_for('booking_status', booking_id=b.id) }}"><input type="hidden" name="status" value="Returned"><button class="btn green block">✅ Mark completed</button></form>
+    {% else %}
+      <form method="post" action="{{ url_for('booking_status', booking_id=b.id) }}"><input type="hidden" name="status" value="Booked"><button class="btn light block">↩ Reopen</button></form>
+    {% endif %}
+    {% if b.status in ('Booked', 'Delivered') %}
+      <form method="post" action="{{ url_for('booking_status', booking_id=b.id) }}" onsubmit="return confirm('Cancel this booking?')"><input type="hidden" name="status" value="Cancelled"><button class="btn danger block">Cancel</button></form>
+    {% endif %}
+  </div>
+</div>
 
-<div class="row">
-  <form method="post" action="{{ url_for('booking_payment', booking_id=b.id) }}" class="card">
-    <h2>Record payment</h2>
-    <input type="number" name="amount" min="0.01" step="0.01" placeholder="Amount" required>
-    <select name="kind">{% for k in kinds %}<option>{{ k }}</option>{% endfor %}</select>
-    <p><button class="btn small">Add</button></p>
-    {% for p in t.payments %}<div>{{ p.paid_on }} — {{ p.kind }}: {{ p.amount|money }}</div>{% endfor %}
-  </form>
-  <form method="post" action="{{ url_for('booking_status', booking_id=b.id) }}" class="card">
-    <h2>Status</h2>
-    <select name="status">{% for s in statuses %}<option {{ 'selected' if s == b.status }}>{{ s }}</option>{% endfor %}</select>
-    <p><button class="btn small">Update</button></p>
+<div class="section"><h2>Items</h2></div>
+<div class="card">
+  <table class="lines">
+    <tr><th>Item</th><th class="num">Qty</th><th class="num">Rent</th></tr>
+    {% for l in t.lines %}
+    <tr><td>{{ l.name }}<div class="muted">{{ l.rate|money }} × {{ t.days }}d</div></td><td class="num">{{ l.qty }}</td><td class="num">{{ (l.qty * l.rate * t.days)|money }}</td></tr>
+    {% endfor %}
+  </table>
+</div>
+
+<div class="section"><h2>Bill</h2><a href="{{ url_for('invoice', booking_id=b.id) }}" target="_blank">🧾 Invoice</a></div>
+<div class="card">
+  <table class="lines">
+    <tr><td>Rent</td><td class="num">{{ t.rent|money }}</td></tr>
+    {% if t.discount %}<tr><td>Discount</td><td class="num">-{{ t.discount|money }}</td></tr>{% endif %}
+    <tr><td>Refundable deposit</td><td class="num">{{ t.deposit|money }}</td></tr>
+    {% if t.damage %}<tr><td>Damage charges</td><td class="num">{{ t.damage|money }}</td></tr>{% endif %}
+    <tr class="total"><td>Total</td><td class="num">{{ t.total|money }}</td></tr>
+    <tr><td>Paid</td><td class="num">{{ t.paid|money }}</td></tr>
+    {% if t.refunded %}<tr><td>Deposit refunded</td><td class="num">{{ t.refunded|money }}</td></tr>{% endif %}
+    <tr class="total"><td>Balance</td><td class="num" style="color:{{ 'var(--red)' if t.balance > 0 else 'var(--green)' }}">{{ t.balance|money }}</td></tr>
+  </table>
+</div>
+
+<div class="section"><h2>Payments</h2></div>
+<div class="card">
+  {% for p in t.payments %}<div class="row between" style="padding:4px 0"><span>{{ p.paid_on|dmy }} · {{ p.kind }}</span><b>{{ p.amount|money }}</b></div>{% else %}<div class="muted">No payments yet</div>{% endfor %}
+  <form method="post" action="{{ url_for('booking_payment', booking_id=b.id) }}" class="mt">
+    <div class="grid2">
+      <input type="number" inputmode="decimal" name="amount" min="0.01" step="0.01" placeholder="Amount ₹" required>
+      <select name="kind">{% for k in kinds %}<option>{{ k }}</option>{% endfor %}</select>
+    </div>
+    <button class="btn light block mt">Add payment</button>
   </form>
 </div>
-<a class="btn" href="{{ url_for('invoice', booking_id=b.id) }}" target="_blank">Print invoice</a>
-<form class="inline" method="post" action="{{ url_for('booking_delete', booking_id=b.id) }}" onsubmit="return confirm('Delete booking?')">
-  <button class="btn danger">Delete</button></form>
+
+<div class="section"><h2>Damages</h2><a href="{{ url_for('stock.damage_new', booking_id=b.id) }}">＋ Report</a></div>
+{% for d in t.damages %}
+<div class="card row between"><div><strong>{{ d.name }} × {{ d.qty }}</strong><div class="muted">{{ d.kind }}{% if d.note %} · {{ d.note }}{% endif %}</div></div><b>{{ d.charge|money }}</b></div>
+{% else %}<div class="muted" style="margin:0 2px 12px">No damage reported</div>{% endfor %}
+
+<form method="post" action="{{ url_for('booking_delete', booking_id=b.id) }}" onsubmit="return confirm('Delete this booking permanently?')" class="noprint">
+  <button class="btn danger block">Delete booking</button>
+</form>
 {% endblock %}

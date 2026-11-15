@@ -1,0 +1,14 @@
+{% macro pill(b) %}{% set s = status_info(b) %}<span class="pill {{ s[1] }}">{{ s[0] }}</span>{% endmacro %}
+
+{% macro booking_card(b) %}
+<a class="card" href="{{ url_for('booking_view', booking_id=b.id) }}">
+  <div class="row between">
+    <strong>#{{ b.id }} · {{ b.customer }}</strong>{{ pill(b) }}
+  </div>
+  <div class="muted mt">{{ b.event_type }} · {{ b.start_date|dmy }} → {{ b.end_date|dmy }}</div>
+</a>
+{% endmacro %}
+
+{% macro empty(icon, text) %}
+<div class="empty"><b>{{ icon }}</b>{{ text }}</div>
+{% endmacro %}

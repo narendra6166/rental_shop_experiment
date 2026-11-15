@@ -1,18 +1,18 @@
 {% extends "base.html" %}
+{% from "_macros.html" import booking_card, empty %}
+{% block back %}{% endblock %}
+{% block title %}Bookings{% endblock %}
+{% block subtitle %}<small>{{ counts['all'] }} total</small>{% endblock %}
 {% block content %}
-<h1>Bookings</h1>
-<p>Filter:
-  <a href="{{ url_for('bookings') }}">All</a>
-  {% for s in statuses %}| <a href="{{ url_for('bookings', status=s) }}">{{ s }}</a> {% endfor %}
-</p>
-<table>
-  <tr><th>#</th><th>Customer</th><th>Phone</th><th>Event</th><th>From</th><th>To</th><th>Status</th></tr>
-  {% for b in bookings %}
-  <tr><td><a href="{{ url_for('booking_view', booking_id=b.id) }}">{{ b.id }}</a></td>
-      <td>{{ b.customer }}</td><td>{{ b.phone }}</td><td>{{ b.event_type }}</td>
-      <td>{{ b.start_date }}</td><td>{{ b.end_date }}</td><td><span class="badge">{{ b.status }}</span></td></tr>
-  {% else %}
-  <tr><td colspan="7">No bookings.</td></tr>
+<form class="search" style="margin-top:0" action="{{ url_for('bookings') }}">
+  <input type="hidden" name="tab" value="{{ tab }}">
+  <input name="q" placeholder="Search customer, phone, #" value="{{ q }}">
+  <button>🔍</button>
+</form>
+<div class="chips" style="margin-top:12px">
+  {% for key, label, _ in tabs %}
+  <a class="chip {{ 'on' if tab == key }}" href="{{ url_for('bookings', tab=key, q=q or None) }}">{{ label }}<em>{{ counts[key] }}</em></a>
   {% endfor %}
-</table>
+</div>
+{% for b in bookings %}{{ booking_card(b) }}{% else %}{{ empty('📭', 'No bookings here') }}{% endfor %}
 {% endblock %}
