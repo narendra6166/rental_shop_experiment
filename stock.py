@@ -2,7 +2,7 @@ from datetime import date
 
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 
-from db import booked_qty, damaged_open, get_db, parse_date
+from db import OUT_STATUSES, booked_qty, damaged_open, get_db, parse_date
 from i18n import _
 
 stock_bp = Blueprint("stock", __name__)
@@ -20,23 +20,13 @@ def stock():
         start_s = end_s = today
     rows = []
     for i in db.execute("SELECT * FROM items ORDER BY category, name").fetchall():
-        reserved = booked_qty(db, i["id"], start_s, end_s)
+        # Everything below is for the selected dates (peak on any single day).
+        booked = booked_qty(db, i["id"], start_s, end_s, statuses=("Booked",))
+        on_rent = booked_qty(db, i["id"], start_s, end_s, statuses=OUT_STATUSES)
+        taken = booked_qty(db, i["id"], start_s, end_s)
         damaged = damaged_open(db, i["id"])
-        out_now = db.execute(
-            """SELECT COALESCE(SUM(bi.qty), 0) FROM booking_items bi
-               JOIN bookings b ON b.id = bi.booking_id
-               WHERE bi.item_id = ? AND b.status IN ('Delivered', 'WorkDone')""",
-            (i["id"],),
-        ).fetchone()[0]
-        upcoming = db.execute(
-            """SELECT COALESCE(SUM(bi.qty), 0) FROM booking_items bi
-               JOIN bookings b ON b.id = bi.booking_id
-               WHERE bi.item_id = ? AND b.status = 'Booked' AND b.end_date >= ?""",
-            (i["id"], today),
-        ).fetchone()[0]
-        free = i["total_qty"] - damaged - reserved
-        rows.append({"i": i, "reserved": reserved, "damaged": damaged, "out_now": out_now, "upcoming": upcoming,
-                     "free": free})
+        rows.append({"i": i, "booked": booked, "on_rent": on_rent, "taken": taken,
+                     "damaged": damaged, "free": i["total_qty"] - damaged - taken})
     pending = db.execute(
         """SELECT b.id, b.end_date, b.start_date, c.name AS customer, c.phone,
                   GROUP_CONCAT(i.name || ' × ' || bi.qty, ', ') AS items, SUM(bi.qty) AS qty
@@ -45,10 +35,9 @@ def stock():
            WHERE b.status IN ('Delivered', 'WorkDone') GROUP BY b.id ORDER BY b.end_date""").fetchall()
     summary = {
         "total": sum(r["i"]["total_qty"] for r in rows),
-        "on_rent": sum(r["out_now"] for r in rows),
-        "upcoming": sum(r["upcoming"] for r in rows),
-        "damaged": sum(r["damaged"] for r in rows),
         "free": sum(max(r["free"], 0) for r in rows),
+        "taken": sum(r["taken"] for r in rows),
+        "damaged": sum(r["damaged"] for r in rows),
     }
     return render_template("stock.html", rows=rows, start=start_s, end=end_s,
                            pending=pending, summary=summary, today=today)

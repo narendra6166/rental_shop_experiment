@@ -208,7 +208,7 @@ def rental_days(start, end):
 
 
 # ---------- Stock ----------
-def booked_qty(db, item_id, start, end, exclude_booking=None):
+def booked_qty(db, item_id, start, end, exclude_booking=None, statuses=("Booked", "Delivered", "WorkDone")):
     """Max units of an item unavailable on any single day within [start, end].
 
     A delivered booking keeps its items out until it is marked returned, so an overdue
@@ -217,18 +217,19 @@ def booked_qty(db, item_id, start, end, exclude_booking=None):
     rows = db.execute(
         """SELECT b.start_date, b.end_date, b.status, bi.qty FROM booking_items bi
            JOIN bookings b ON b.id = bi.booking_id
-           WHERE bi.item_id = ? AND b.status IN ('Booked', 'Delivered', 'WorkDone')
-             AND b.start_date <= ? AND b.id IS NOT ?""",
-        (item_id, end, exclude_booking),
+           WHERE bi.item_id = ? AND b.status IN ({})
+             AND b.id IS NOT ?""".format(",".join("?" * len(statuses))),
+        (item_id, *statuses, exclude_booking),
     ).fetchall()
     today = date.today().isoformat()
     spans = []
     for r in rows:
-        last = r["end_date"]
-        if r["status"] in OUT_STATUSES and last < today:
-            last = today
-        if last >= start:
-            spans.append((r["start_date"], last, r["qty"]))
+        first, last = r["start_date"], r["end_date"]
+        if r["status"] in OUT_STATUSES:
+            # Items are physically out from the day work started until they come back.
+            first, last = min(first, today), max(last, today)
+        if first <= end and last >= start:
+            spans.append((first, last, r["qty"]))
     peak = 0
     day, last_day = parse_date(start), parse_date(end)
     while day <= last_day:
