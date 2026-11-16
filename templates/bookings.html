@@ -1,18 +1,18 @@
 {% extends "base.html" %}
 {% from "_macros.html" import booking_card, empty %}
 {% block back %}{% endblock %}
-{% block title %}Bookings{% endblock %}
-{% block subtitle %}<small>{{ counts['all'] }} total</small>{% endblock %}
+{% block title %}{{ _('Bookings') }}{% endblock %}
+{% block subtitle %}<small>{{ _('{n} total', n=counts['all']) }}</small>{% endblock %}
 {% block content %}
 <form class="search" style="margin-top:0" action="{{ url_for('bookings') }}">
   <input type="hidden" name="tab" value="{{ tab }}">
-  <input name="q" placeholder="Search customer, phone, #" value="{{ q }}">
+  <input name="q" placeholder="{{ _('Search customer, phone, #') }}" value="{{ q }}">
   <button>🔍</button>
 </form>
 <div class="chips" style="margin-top:12px">
-  {% for key, label, _ in tabs %}
-  <a class="chip {{ 'on' if tab == key }}" href="{{ url_for('bookings', tab=key, q=q or None) }}">{{ label }}<em>{{ counts[key] }}</em></a>
+  {% for key, label, unused in tabs %}
+  <a class="chip {{ 'on' if tab == key }}" href="{{ url_for('bookings', tab=key, q=q or None) }}">{{ _(label) }}<em>{{ counts[key] }}</em></a>
   {% endfor %}
 </div>
-{% for b in bookings %}{{ booking_card(b) }}{% else %}{{ empty('📭', 'No bookings here') }}{% endfor %}
+{% for b in bookings %}{{ booking_card(b) }}{% else %}{{ empty('📭', _('No bookings here')) }}{% endfor %}
 {% endblock %}

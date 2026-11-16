@@ -1,21 +1,21 @@
 {% extends "base.html" %}
 {% from "_macros.html" import empty %}
 {% block back %}{% endblock %}
-{% block title %}Staff{% endblock %}
-{% block subtitle %}<small>{{ people|length }} members</small>{% endblock %}
-{% block hero_action %}<a class="circle" href="{{ url_for('staff.attendance') }}" title="Attendance">✅</a>{% endblock %}
-{% block fab %}<a class="fab noprint" href="{{ url_for('staff.staff_form') }}">＋ Staff</a>{% endblock %}
+{% block title %}{{ _('Staff') }}{% endblock %}
+{% block subtitle %}<small>{{ _('{n} members', n=people|length) }}</small>{% endblock %}
+{% block hero_action %}<a class="circle" href="{{ url_for('staff.attendance') }}" title="{{ _('Attendance') }}">✅</a>{% endblock %}
+{% block fab %}<a class="fab noprint" href="{{ url_for('staff.staff_form') }}">＋ {{ _('Staff') }}</a>{% endblock %}
 {% block content %}
-<a class="btn light block" href="{{ url_for('staff.attendance') }}" style="margin-bottom:12px">✅ Mark today's attendance</a>
+<a class="btn light block" href="{{ url_for('staff.attendance') }}" style="margin-bottom:12px">✅ {{ _("Mark today's attendance") }}</a>
 {% for p in people %}
 <a class="card" href="{{ url_for('staff.staff_view', staff_id=p.s.id) }}" style="{{ 'opacity:.55' if not p.s.active }}">
   <div class="row">
     <div class="avatar">{{ p.s.name[:1]|upper }}</div>
-    <div class="grow"><strong>{{ p.s.name }}</strong><div class="muted">{{ p.s.role }}{% if not p.s.active %} · inactive{% endif %}</div></div>
-    {% if p.today %}<span class="pill {{ {'Present': 'green', 'Half': 'orange', 'Absent': 'red', 'Leave': 'purple'}[p.today] }}">{{ p.today }}</span>
-    {% else %}<span class="pill grey">Not marked</span>{% endif %}
+    <div class="grow"><strong>{{ p.s.name }}</strong><div class="muted">{{ p.s.role }}{% if not p.s.active %} · {{ _('inactive') }}{% endif %}</div></div>
+    {% if p.today %}<span class="pill {{ {'Present': 'green', 'Half': 'orange', 'Absent': 'red', 'Leave': 'purple'}[p.today] }}">{{ _(p.today) }}</span>
+    {% else %}<span class="pill grey">{{ _('Not marked') }}</span>{% endif %}
   </div>
-  <div class="row between mt muted"><span>Salary {{ p.s.monthly_salary|money }}</span><span>This month due: <b style="color:var(--ink)">{{ p.sum.due|money }}</b></span></div>
+  <div class="row between mt muted"><span>{{ _('Salary {amt}', amt=p.s.monthly_salary|money) }}</span><span>{{ _('This month due:') }} <b style="color:var(--ink)">{{ p.sum.due|money }}</b></span></div>
 </a>
-{% else %}{{ empty('👷', 'No staff yet. Tap ＋ Staff to add.') }}{% endfor %}
+{% else %}{{ empty('👷', _('No staff yet. Tap ＋ Staff to add.')) }}{% endfor %}
 {% endblock %}

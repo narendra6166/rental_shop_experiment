@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% from "_macros.html" import pill %}
-{% block title %}Booking #{{ b.id }}{% endblock %}
+{% block title %}{{ _('Booking #{n}', n=b.id) }}{% endblock %}
 {% block subtitle %}<small>{{ b.customer }}</small>{% endblock %}
 {% block hero_action %}{{ pill(b) }}{% endblock %}
 {% block fab %}{% endblock %}
@@ -10,71 +10,71 @@
   <strong>{{ b.customer }}</strong>
   <div class="row mt wrapflex">
     <a class="btn light sm" href="tel:{{ b.phone }}">📞 {{ b.phone }}</a>
-    <a class="btn light sm" href="https://wa.me/{{ b.phone|replace('+','')|replace(' ','') }}" target="_blank">💬 WhatsApp</a>
+    <a class="btn light sm" href="https://wa.me/{{ b.phone|replace('+','')|replace(' ','') }}" target="_blank">💬 {{ _('WhatsApp') }}</a>
   </div>
   {% if b.address %}<div class="muted mt">📍 {{ b.address }}</div>{% endif %}
-  <div class="muted mt">🎉 {{ b.event_type }} · {{ b.start_date|dmy }} → {{ b.end_date|dmy }} ({{ t.days }} day{{ 's' if t.days > 1 }})</div>
+  <div class="muted mt">🎉 {{ _(b.event_type) }} · {{ b.start_date|dmy }} → {{ b.end_date|dmy }} ({{ _('{n} days' if t.days > 1 else '{n} day', n=t.days) }})</div>
   {% if b.notes %}<div class="muted mt">📝 {{ b.notes }}</div>{% endif %}
 </div>
 
 <div class="card">
-  <div class="muted" style="margin-bottom:8px">Update progress</div>
+  <div class="muted" style="margin-bottom:8px">{{ _('Update progress') }}</div>
   <div class="grid2">
     {% if b.status == 'Booked' %}
-      <form method="post" action="{{ url_for('booking_status', booking_id=b.id) }}"><input type="hidden" name="status" value="Delivered"><button class="btn block">🚚 Start work</button></form>
+      <form method="post" action="{{ url_for('booking_status', booking_id=b.id) }}"><input type="hidden" name="status" value="Delivered"><button class="btn block">🚚 {{ _('Start work') }}</button></form>
     {% elif b.status == 'Delivered' %}
-      <form method="post" action="{{ url_for('booking_status', booking_id=b.id) }}"><input type="hidden" name="status" value="Returned"><button class="btn green block">✅ Mark completed</button></form>
+      <form method="post" action="{{ url_for('booking_status', booking_id=b.id) }}"><input type="hidden" name="status" value="Returned"><button class="btn green block">✅ {{ _('Mark completed') }}</button></form>
     {% else %}
-      <form method="post" action="{{ url_for('booking_status', booking_id=b.id) }}"><input type="hidden" name="status" value="Booked"><button class="btn light block">↩ Reopen</button></form>
+      <form method="post" action="{{ url_for('booking_status', booking_id=b.id) }}"><input type="hidden" name="status" value="Booked"><button class="btn light block">↩ {{ _('Reopen') }}</button></form>
     {% endif %}
     {% if b.status in ('Booked', 'Delivered') %}
-      <form method="post" action="{{ url_for('booking_status', booking_id=b.id) }}" onsubmit="return confirm('Cancel this booking?')"><input type="hidden" name="status" value="Cancelled"><button class="btn danger block">Cancel</button></form>
+      <form method="post" action="{{ url_for('booking_status', booking_id=b.id) }}" onsubmit="return confirm({{ _('Cancel this booking?')|tojson|forceescape }})"><input type="hidden" name="status" value="Cancelled"><button class="btn danger block">{{ _('Cancel') }}</button></form>
     {% endif %}
   </div>
 </div>
 
-<div class="section"><h2>Items</h2></div>
+<div class="section"><h2>{{ _('Items') }}</h2></div>
 <div class="card">
   <table class="lines">
-    <tr><th>Item</th><th class="num">Qty</th><th class="num">Rent</th></tr>
+    <tr><th>{{ _('Item') }}</th><th class="num">{{ _('Qty') }}</th><th class="num">{{ _('Rent') }}</th></tr>
     {% for l in t.lines %}
-    <tr><td>{{ l.name }}<div class="muted">{{ l.rate|money }} × {{ t.days }}d</div></td><td class="num">{{ l.qty }}</td><td class="num">{{ (l.qty * l.rate * t.days)|money }}</td></tr>
+    <tr><td>{{ l.name }}<div class="muted">{{ _('{rate} × {n}d', rate=l.rate|money, n=t.days) }}</div></td><td class="num">{{ l.qty }}</td><td class="num">{{ (l.qty * l.rate * t.days)|money }}</td></tr>
     {% endfor %}
   </table>
 </div>
 
-<div class="section"><h2>Bill</h2><a href="{{ url_for('invoice', booking_id=b.id) }}" target="_blank">🧾 Invoice</a></div>
+<div class="section"><h2>{{ _('Bill') }}</h2><a href="{{ url_for('invoice', booking_id=b.id) }}" target="_blank">🧾 {{ _('Invoice') }}</a></div>
 <div class="card">
   <table class="lines">
-    <tr><td>Rent</td><td class="num">{{ t.rent|money }}</td></tr>
-    {% if t.discount %}<tr><td>Discount</td><td class="num">-{{ t.discount|money }}</td></tr>{% endif %}
-    <tr><td>Refundable deposit</td><td class="num">{{ t.deposit|money }}</td></tr>
-    {% if t.damage %}<tr><td>Damage charges</td><td class="num">{{ t.damage|money }}</td></tr>{% endif %}
-    <tr class="total"><td>Total</td><td class="num">{{ t.total|money }}</td></tr>
-    <tr><td>Paid</td><td class="num">{{ t.paid|money }}</td></tr>
-    {% if t.refunded %}<tr><td>Deposit refunded</td><td class="num">{{ t.refunded|money }}</td></tr>{% endif %}
-    <tr class="total"><td>Balance</td><td class="num" style="color:{{ 'var(--red)' if t.balance > 0 else 'var(--green)' }}">{{ t.balance|money }}</td></tr>
+    <tr><td>{{ _('Rent') }}</td><td class="num">{{ t.rent|money }}</td></tr>
+    {% if t.discount %}<tr><td>{{ _('Discount') }}</td><td class="num">-{{ t.discount|money }}</td></tr>{% endif %}
+    <tr><td>{{ _('Refundable deposit') }}</td><td class="num">{{ t.deposit|money }}</td></tr>
+    {% if t.damage %}<tr><td>{{ _('Damage charges') }}</td><td class="num">{{ t.damage|money }}</td></tr>{% endif %}
+    <tr class="total"><td>{{ _('Total') }}</td><td class="num">{{ t.total|money }}</td></tr>
+    <tr><td>{{ _('Paid') }}</td><td class="num">{{ t.paid|money }}</td></tr>
+    {% if t.refunded %}<tr><td>{{ _('Deposit refunded') }}</td><td class="num">{{ t.refunded|money }}</td></tr>{% endif %}
+    <tr class="total"><td>{{ _('Balance') }}</td><td class="num" style="color:{{ 'var(--red)' if t.balance > 0 else 'var(--green)' }}">{{ t.balance|money }}</td></tr>
   </table>
 </div>
 
-<div class="section"><h2>Payments</h2></div>
+<div class="section"><h2>{{ _('Payments') }}</h2></div>
 <div class="card">
-  {% for p in t.payments %}<div class="row between" style="padding:4px 0"><span>{{ p.paid_on|dmy }} · {{ p.kind }}</span><b>{{ p.amount|money }}</b></div>{% else %}<div class="muted">No payments yet</div>{% endfor %}
+  {% for p in t.payments %}<div class="row between" style="padding:4px 0"><span>{{ p.paid_on|dmy }} · {{ _(p.kind) }}</span><b>{{ p.amount|money }}</b></div>{% else %}<div class="muted">{{ _('No payments yet') }}</div>{% endfor %}
   <form method="post" action="{{ url_for('booking_payment', booking_id=b.id) }}" class="mt">
     <div class="grid2">
-      <input type="number" inputmode="decimal" name="amount" min="0.01" step="0.01" placeholder="Amount ₹" required>
-      <select name="kind">{% for k in kinds %}<option>{{ k }}</option>{% endfor %}</select>
+      <input type="number" inputmode="decimal" name="amount" min="0.01" step="0.01" placeholder="{{ _('Amount ₹') }}" required>
+      <select name="kind">{% for k in kinds %}<option value="{{ k }}">{{ _(k) }}</option>{% endfor %}</select>
     </div>
-    <button class="btn light block mt">Add payment</button>
+    <button class="btn light block mt">{{ _('Add payment') }}</button>
   </form>
 </div>
 
-<div class="section"><h2>Damages</h2><a href="{{ url_for('stock.damage_new', booking_id=b.id) }}">＋ Report</a></div>
+<div class="section"><h2>{{ _('Damages') }}</h2><a href="{{ url_for('stock.damage_new', booking_id=b.id) }}">＋ {{ _('Report') }}</a></div>
 {% for d in t.damages %}
-<div class="card row between"><div><strong>{{ d.name }} × {{ d.qty }}</strong><div class="muted">{{ d.kind }}{% if d.note %} · {{ d.note }}{% endif %}</div></div><b>{{ d.charge|money }}</b></div>
-{% else %}<div class="muted" style="margin:0 2px 12px">No damage reported</div>{% endfor %}
+<div class="card row between"><div><strong>{{ d.name }} × {{ d.qty }}</strong><div class="muted">{{ _(d.kind) }}{% if d.note %} · {{ d.note }}{% endif %}</div></div><b>{{ d.charge|money }}</b></div>
+{% else %}<div class="muted" style="margin:0 2px 12px">{{ _('No damage reported') }}</div>{% endfor %}
 
-<form method="post" action="{{ url_for('booking_delete', booking_id=b.id) }}" onsubmit="return confirm('Delete this booking permanently?')" class="noprint">
-  <button class="btn danger block">Delete booking</button>
+<form method="post" action="{{ url_for('booking_delete', booking_id=b.id) }}" onsubmit="return confirm({{ _('Delete this booking permanently?')|tojson|forceescape }})" class="noprint">
+  <button class="btn danger block">{{ _('Delete booking') }}</button>
 </form>
 {% endblock %}

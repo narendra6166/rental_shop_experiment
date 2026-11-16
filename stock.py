@@ -3,6 +3,7 @@ from datetime import date
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 
 from db import booked_qty, damaged_open, get_db, parse_date
+from i18n import _
 
 stock_bp = Blueprint("stock", __name__)
 
@@ -15,7 +16,7 @@ def stock():
     end_s = request.args.get("end_date") or start_s
     start, end = parse_date(start_s), parse_date(end_s)
     if not start or not end or end < start:
-        flash("End date must be on or after start date.", "error")
+        flash(_("End date must be on or after start date."), "error")
         start_s = end_s = today
     rows = []
     for i in db.execute("SELECT * FROM items ORDER BY category, name").fetchall():
@@ -66,10 +67,10 @@ def damage_new():
             if not item or qty <= 0 or charge < 0:
                 raise ValueError
         except (KeyError, ValueError):
-            flash("Select an item and enter a valid quantity and charge.", "error")
+            flash(_("Select an item and enter a valid quantity and charge."), "error")
         else:
             if qty > item["total_qty"] - damaged_open(db, item_id):
-                flash("Quantity is more than the stock you have.", "error")
+                flash(_("Quantity is more than the stock you have."), "error")
             else:
                 kind = "Lost" if form.get("kind") == "Lost" else "Damaged"
                 booking_id = int(form["booking_id"]) if form.get("booking_id", "").isdigit() else None
@@ -80,7 +81,7 @@ def damage_new():
                      date.today().isoformat()),
                 )
                 db.commit()
-                flash("Damage recorded. Stock updated.", "ok")
+                flash(_("Damage recorded. Stock updated."), "ok")
                 if booking_id:
                     return redirect(url_for("booking_view", booking_id=booking_id))
                 return redirect(url_for("stock.damages"))
@@ -94,11 +95,11 @@ def damage_resolve(damage_id):
     if d:
         if request.form.get("action") == "repaired":
             db.execute("UPDATE damages SET status = 'Repaired' WHERE id = ?", (damage_id,))
-            flash("Marked repaired. Units are back in stock.", "ok")
+            flash(_("Marked repaired. Units are back in stock."), "ok")
         else:
             db.execute("UPDATE items SET total_qty = MAX(total_qty - ?, 0) WHERE id = ?",
                        (d["qty"], d["item_id"]))
             db.execute("UPDATE damages SET status = 'Written off' WHERE id = ?", (damage_id,))
-            flash("Written off. Total stock reduced.", "ok")
+            flash(_("Written off. Total stock reduced."), "ok")
         db.commit()
     return redirect(url_for("stock.damages"))

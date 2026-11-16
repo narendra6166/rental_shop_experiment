@@ -1,24 +1,24 @@
 {% extends "base.html" %}
 {% from "_macros.html" import empty %}
-{% block title %}Damaged &amp; lost{% endblock %}
-{% block fab %}<a class="fab noprint" href="{{ url_for('stock.damage_new') }}">＋ Report</a>{% endblock %}
+{% block title %}{{ _('Damaged & lost') }}{% endblock %}
+{% block fab %}<a class="fab noprint" href="{{ url_for('stock.damage_new') }}">＋ {{ _('Report') }}</a>{% endblock %}
 {% block content %}
 <div class="chips">
-  <a class="chip {{ 'on' if show == 'open' }}" href="{{ url_for('stock.damages', show='open') }}">Open</a>
-  <a class="chip {{ 'on' if show == 'all' }}" href="{{ url_for('stock.damages', show='all') }}">History</a>
+  <a class="chip {{ 'on' if show == 'open' }}" href="{{ url_for('stock.damages', show='open') }}">{{ _('Open') }}</a>
+  <a class="chip {{ 'on' if show == 'all' }}" href="{{ url_for('stock.damages', show='all') }}">{{ _('History') }}</a>
 </div>
 {% for d in rows %}
 <div class="card">
   <div class="row between"><strong>{{ d.item }} × {{ d.qty }}</strong>
-    <span class="pill {{ {'Open': 'red', 'Repaired': 'green', 'Written off': 'grey'}[d.status] }}">{{ d.status }}</span></div>
-  <div class="muted mt">{{ d.kind }} · {{ d.reported_on|dmy }}{% if d.bid %} · <a style="color:var(--primary)" href="{{ url_for('booking_view', booking_id=d.bid) }}">#{{ d.bid }} {{ d.customer }}</a>{% endif %}{% if d.charge %} · charged {{ d.charge|money }}{% endif %}</div>
+    <span class="pill {{ {'Open': 'red', 'Repaired': 'green', 'Written off': 'grey'}[d.status] }}">{{ _(d.status) }}</span></div>
+  <div class="muted mt">{{ _(d.kind) }} · {{ d.reported_on|dmy }}{% if d.bid %} · <a style="color:var(--primary)" href="{{ url_for('booking_view', booking_id=d.bid) }}">#{{ d.bid }} {{ d.customer }}</a>{% endif %}{% if d.charge %} · {{ _('charged {amt}', amt=d.charge|money) }}{% endif %}</div>
   {% if d.note %}<div class="muted">📝 {{ d.note }}</div>{% endif %}
   {% if d.status == 'Open' %}
   <div class="row mt">
-    <form class="inline" method="post" action="{{ url_for('stock.damage_resolve', damage_id=d.id) }}"><input type="hidden" name="action" value="repaired"><button class="btn green sm">🔧 Repaired</button></form>
-    <form class="inline" method="post" action="{{ url_for('stock.damage_resolve', damage_id=d.id) }}" onsubmit="return confirm('Write off? Total stock will reduce.')"><input type="hidden" name="action" value="writeoff"><button class="btn danger sm">Write off</button></form>
+    <form class="inline" method="post" action="{{ url_for('stock.damage_resolve', damage_id=d.id) }}"><input type="hidden" name="action" value="repaired"><button class="btn green sm">🔧 {{ _('Repaired') }}</button></form>
+    <form class="inline" method="post" action="{{ url_for('stock.damage_resolve', damage_id=d.id) }}" onsubmit="return confirm({{ _('Write off? Total stock will reduce.')|tojson|forceescape }})"><input type="hidden" name="action" value="writeoff"><button class="btn danger sm">{{ _('Write off') }}</button></form>
   </div>
   {% endif %}
 </div>
-{% else %}{{ empty('✨', 'No damaged items') }}{% endfor %}
+{% else %}{{ empty('✨', _('No damaged items')) }}{% endfor %}
 {% endblock %}

@@ -1,20 +1,20 @@
 {% extends "base.html" %}
-{% block title %}{{ 'Edit' if staff_id else 'Add' }} staff{% endblock %}
+{% block title %}{{ _('Edit staff') if staff_id else _('Add staff') }}{% endblock %}
 {% block fab %}{% endblock %}
 {% block content %}
 <form method="post" class="card">
-  <label style="margin-top:0">Name</label><input name="name" required value="{{ p.get('name', '') }}">
-  <label>Phone</label><input name="phone" type="tel" inputmode="tel" value="{{ p.get('phone', '') or '' }}">
-  <label>Role</label><input name="role" required list="roles" placeholder="Driver, Helper, Cook..." value="{{ p.get('role', '') }}">
+  <label style="margin-top:0">{{ _('Name') }}</label><input name="name" required value="{{ p.get('name', '') }}">
+  <label>{{ _('Phone') }}</label><input name="phone" type="tel" inputmode="tel" value="{{ p.get('phone', '') or '' }}">
+  <label>{{ _('Role') }}</label><input name="role" required list="roles" placeholder="{{ _('Driver, Helper, Cook...') }}" value="{{ p.get('role', '') }}">
   <datalist id="roles"><option>Driver</option><option>Helper</option><option>Loader</option><option>Tent worker</option><option>Supervisor</option></datalist>
   <div class="grid2">
-    <div><label>Monthly salary (₹)</label><input type="number" inputmode="decimal" min="0" step="1" name="monthly_salary" required value="{{ p.get('monthly_salary', '') }}"></div>
-    <div><label>Joining date</label><input type="date" name="join_date" value="{{ p.get('join_date', '') or '' }}"></div>
+    <div><label>{{ _('Monthly salary (₹)') }}</label><input type="number" inputmode="decimal" min="0" step="1" name="monthly_salary" required value="{{ p.get('monthly_salary', '') }}"></div>
+    <div><label>{{ _('Joining date') }}</label><input type="date" name="join_date" value="{{ p.get('join_date', '') or '' }}"></div>
   </div>
   {% if staff_id %}
-  <label>Status</label>
-  <select name="active"><option value="1" {{ 'selected' if p.get('active', 1)|string == '1' }}>Active</option><option value="0" {{ 'selected' if p.get('active', 1)|string == '0' }}>Inactive (left)</option></select>
+  <label>{{ _('Status') }}</label>
+  <select name="active"><option value="1" {{ 'selected' if p.get('active', 1)|string == '1' }}>{{ _('Active') }}</option><option value="0" {{ 'selected' if p.get('active', 1)|string == '0' }}>{{ _('Inactive (left)') }}</option></select>
   {% endif %}
-  <button class="btn block mt">Save</button>
+  <button class="btn block mt">{{ _('Save') }}</button>
 </form>
 {% endblock %}

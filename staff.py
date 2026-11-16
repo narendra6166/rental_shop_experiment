@@ -3,6 +3,7 @@ from datetime import date
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 
 from db import SALARY_KINDS, ATTENDANCE, get_db, parse_date, parse_month, salary_summary, shift_month
+from i18n import _
 
 staff_bp = Blueprint("staff", __name__)
 
@@ -41,7 +42,7 @@ def staff_form(staff_id=None):
             if not name or not role or salary < 0:
                 raise ValueError
         except (KeyError, ValueError):
-            flash("Enter name, role and a valid salary.", "error")
+            flash(_("Enter name, role and a valid salary."), "error")
             return render_template("staff_form.html", p=request.form, staff_id=staff_id)
         join = request.form.get("join_date") or date.today().isoformat()
         active = 1 if request.form.get("active", "1") == "1" else 0
@@ -58,7 +59,7 @@ def staff_form(staff_id=None):
                 data,
             )
         db.commit()
-        flash("Staff saved.", "ok")
+        flash(_("Staff saved."), "ok")
         return redirect(url_for("staff.staff_list"))
     return render_template("staff_form.html", p=dict(person) if person else {}, staff_id=staff_id)
 
@@ -92,7 +93,7 @@ def staff_pay(staff_id):
         if amount <= 0:
             raise ValueError
     except (KeyError, ValueError):
-        flash("Enter a valid amount.", "error")
+        flash(_("Enter a valid amount."), "error")
         return redirect(url_for("staff.staff_view", staff_id=staff_id, month=month))
     kind = request.form.get("kind")
     if kind not in SALARY_KINDS:
@@ -103,7 +104,7 @@ def staff_pay(staff_id):
         (staff_id, month, amount, kind, date.today().isoformat(), request.form.get("note", "").strip()),
     )
     db.commit()
-    flash(f"{kind} recorded.", "ok")
+    flash(_("{kind} recorded.", kind=_(kind)), "ok")
     return redirect(url_for("staff.staff_view", staff_id=staff_id, month=month))
 
 
@@ -115,7 +116,7 @@ def staff_pay_delete(staff_id, pay_id):
     if row:
         db.execute("DELETE FROM salary_payments WHERE id = ?", (pay_id,))
         db.commit()
-        flash("Payment removed.", "ok")
+        flash(_("Payment removed."), "ok")
     return redirect(url_for("staff.staff_view", staff_id=staff_id, month=row["month"] if row else None))
 
 

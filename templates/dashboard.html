@@ -4,16 +4,17 @@
 <header class="hero tall"><div class="wrap">
   <div class="top">
     <div class="grow">
-      <small>📅 {{ today().strftime('%A, %d %B') }}</small>
-      <div class="title">{{ shop_name }}</div>
+      <small>📅 {{ today()|ldate('%A, %d %B') }}</small>
+      <div class="title">{{ _(shop_name) }}</div>
     </div>
+    <a class="circle" href="{{ url_for('more') }}#lang" title="{{ _('Language') }}">🌐</a>
     <a class="circle" href="{{ url_for('more') }}">☰</a>
   </div>
-  <div class="big">Everything<br>for your event.</div>
+  <div class="big">{{ _('Everything for your event.') }}</div>
 </div></header>
 <div class="wrap">
   <form class="search" action="{{ url_for('bookings') }}">
-    <input name="q" placeholder="Search customer, phone, booking #">
+    <input name="q" placeholder="{{ _('Search customer, phone, booking #') }}">
     <button>🔍</button>
   </form>
 </div>
@@ -21,32 +22,32 @@
 {% block content %}
 <div class="tiles">
   <a class="tile big t-peach" href="{{ url_for('bookings', tab='soon') }}">
-    <div>Bookings<div class="count">{{ stats.soon }} starting soon</div></div><span class="emoji">🎪</span></a>
+    <div>{{ _('Bookings') }}<div class="count">{{ _('{n} starting soon', n=stats.soon) }}</div></div><span class="emoji">🎪</span></a>
   <a class="tile big t-green" href="{{ url_for('stock.stock') }}">
-    <div>Stock<div class="count">Check availability</div></div><span class="emoji">⛺</span></a>
+    <div>{{ _('Stock') }}<div class="count">{{ _('Check availability') }}</div></div><span class="emoji">⛺</span></a>
   <a class="tile small t-blue" href="{{ url_for('staff.staff_list') }}">
-    <div>Staff<div class="count">{{ stats.staff_present }}/{{ stats.staff_total }} in today</div></div><span class="emoji">👷</span></a>
+    <div>{{ _('Staff') }}<div class="count">{{ _('{a}/{b} in today', a=stats.staff_present, b=stats.staff_total) }}</div></div><span class="emoji">👷</span></a>
   <a class="tile small t-lilac" href="{{ url_for('stock.damages') }}">
-    <div>Damaged<div class="count">{{ stats.open_damages }} units</div></div><span class="emoji">🛠️</span></a>
+    <div>{{ _('Damaged') }}<div class="count">{{ _('{n} units', n=stats.open_damages) }}</div></div><span class="emoji">🛠️</span></a>
   <a class="tile small t-yellow" href="{{ url_for('staff.attendance') }}">
-    <div>Attendance<div class="count">Mark today</div></div><span class="emoji">✅</span></a>
+    <div>{{ _('Attendance') }}<div class="count">{{ _('Mark today') }}</div></div><span class="emoji">✅</span></a>
 </div>
 
 <div class="stats mt" style="margin-top:16px">
-  <div class="stat hl"><b>{{ stats.on_work }}</b><span>On work now</span></div>
-  <div class="stat"><b>{{ stats.balance|money }}</b><span>Balance to collect</span></div>
-  <div class="stat"><b>{{ stats.collected|money }}</b><span>Collected this month</span></div>
-  <div class="stat"><b>{{ stats.soon }}</b><span>Starting soon</span></div>
+  <div class="stat hl"><b>{{ stats.on_work }}</b><span>{{ _('On work now') }}</span></div>
+  <div class="stat"><b>{{ stats.balance|money }}</b><span>{{ _('Balance to collect') }}</span></div>
+  <div class="stat"><b>{{ stats.collected|money }}</b><span>{{ _('Collected this month') }}</span></div>
+  <div class="stat"><b>{{ stats.soon }}</b><span>{{ _('Starting soon') }}</span></div>
 </div>
 
 {% if needs_action %}
-<div class="section"><h2>⚠️ Needs action</h2></div>
+<div class="section"><h2>⚠️ {{ _('Needs action') }}</h2></div>
 {% for b in needs_action %}{{ booking_card(b) }}{% endfor %}
 {% endif %}
 
-<div class="section"><h2>Starting soon</h2><a href="{{ url_for('bookings', tab='soon') }}">See all</a></div>
-{% for b in soon %}{{ booking_card(b) }}{% else %}{{ empty('🗓️', 'Nothing starting in the next 3 days') }}{% endfor %}
+<div class="section"><h2>{{ _('Starting soon') }}</h2><a href="{{ url_for('bookings', tab='soon') }}">{{ _('See all') }}</a></div>
+{% for b in soon %}{{ booking_card(b) }}{% else %}{{ empty('🗓️', _('Nothing starting in the next 3 days')) }}{% endfor %}
 
-<div class="section"><h2>On work</h2><a href="{{ url_for('bookings', tab='onwork') }}">See all</a></div>
-{% for b in on_work %}{{ booking_card(b) }}{% else %}{{ empty('🚚', 'No events running right now') }}{% endfor %}
+<div class="section"><h2>{{ _('On work') }}</h2><a href="{{ url_for('bookings', tab='onwork') }}">{{ _('See all') }}</a></div>
+{% for b in on_work %}{{ booking_card(b) }}{% else %}{{ empty('🚚', _('No events running right now')) }}{% endfor %}
 {% endblock %}
