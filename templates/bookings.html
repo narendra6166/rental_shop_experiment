@@ -4,14 +4,17 @@
 {% block title %}{{ _('Bookings') }}{% endblock %}
 {% block subtitle %}<small>{{ _('{n} total', n=counts['all']) }}</small>{% endblock %}
 {% block content %}
-<form class="search" style="margin-top:0" action="{{ url_for('bookings') }}">
+<form class="card" method="get" action="{{ url_for('bookings') }}">
   <input type="hidden" name="tab" value="{{ tab }}">
-  <input name="q" placeholder="{{ _('Search customer, phone, #') }}" value="{{ q }}">
-  <button>🔍</button>
+  <label for="q">{{ _('Search customer, phone, #') }}</label>
+  <input id="q" name="q" value="{{ q }}">
+  {% include "_date_filters.html" %}
+  <p class="muted">{{ _('Shows bookings whose rental dates overlap the selected period.') }}</p>
+  <div class="row wrapflex mt"><button class="btn">{{ _('Apply filters') }}</button><a class="btn light" href="{{ url_for('bookings') }}">{{ _('Reset') }}</a></div>
 </form>
 <div class="chips" style="margin-top:12px">
   {% for key, label, unused in tabs %}
-  <a class="chip {{ 'on' if tab == key }}" href="{{ url_for('bookings', tab=key, q=q or None) }}">{{ _(label) }}<em>{{ counts[key] }}</em></a>
+  <a class="chip {{ 'on' if tab == key }}" href="{{ url_for('bookings', tab=key, q=q or None, **window) }}">{{ _(label) }}<em>{{ counts[key] }}</em></a>
   {% endfor %}
 </div>
 {% for b in bookings %}{{ booking_card(b) }}{% else %}{{ empty('📭', _('No bookings here')) }}{% endfor %}

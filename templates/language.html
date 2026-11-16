@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}{{ _('Language') }}{% endblock %}
+{% block back %}<a class="back" href="{{ url_for('dashboard') }}" aria-label="{{ _('Home') }}">←</a>{% endblock %}
+{% block fab %}{% endblock %}
+{% block nav %}{% endblock %}
+{% block content %}
+<div class="card">
+  {% for code, label in langs.items() %}
+  <a class="btn {{ '' if code == get_lang() else 'light' }} block mt" href="{{ url_for('set_language', code=code, next=url_for('language')) }}" lang="{{ code }}" {% if code == get_lang() %}aria-current="true"{% endif %}>{{ label }}</a>
+  {% endfor %}
+</div>
+{% endblock %}

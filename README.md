@@ -51,6 +51,11 @@ The last active Owner cannot be disabled or demoted.
 | Staff / Worker | Their assigned work and customer contact/location for those jobs only; update their task status |
 
 On a booking, Owners assign a task to an active Staff/Worker login. The assignee sees it under My work.
+Staff supports name/phone/role and active-status filters. Attendance > Attendance history filters recorded
+entries by staff name/member, month, inclusive date range, status or all dates, including inactive staff.
+History totals cover all matches; results are paged in batches of 50. Unmarked dates are not treated as absent.
+Booking filters match rental periods overlapping the selected month/range and retain filters across status tabs.
+The globe opens a language-only chooser, also available from More.
 Task completion does not automatically mark a booking returned or change stock/payments.
 Assigning again to the same person replaces their task and resets its status to Assigned.
 Permissions are enforced for direct requests as well as navigation. New forms use session-bound CSRF tokens.

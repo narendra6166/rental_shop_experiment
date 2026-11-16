@@ -4,14 +4,24 @@
 {% block subtitle %}<small>{{ day|ldate('%A, %d %B %Y') }}</small>{% endblock %}
 {% block fab %}{% endblock %}
 {% block content %}
+<div class="row wrapflex" style="margin-bottom:12px">
+  <a class="btn light" href="{{ url_for('staff.staff_list') }}">{{ _('Staff') }}</a>
+  <a class="btn light" href="{{ url_for('staff.attendance_history', staff_id=staff_id) }}">{{ _('Attendance history') }}</a>
+</div>
+<form class="card" method="get">
+  <label for="staff_id">{{ _('Staff member') }}</label>
+  <select id="staff_id" name="staff_id"><option value="">{{ _('All staff') }}</option>{% for person in staff_choices %}<option value="{{ person.id }}" {{ 'selected' if staff_id == person.id|string }}>{{ person.name }}</option>{% endfor %}</select>
+  <label for="day">{{ _('Date') }}</label><input id="day" type="date" name="day" required value="{{ day.isoformat() }}">
+  <div class="row wrapflex mt"><button class="btn">{{ _('Apply filters') }}</button><a class="btn light" href="{{ url_for('staff.attendance') }}">{{ _('Reset') }}</a></div>
+</form>
 {% set prev = (day - timedelta(days=1)).isoformat() %}
 {% set nxt = (day + timedelta(days=1)).isoformat() %}
 <div class="row between" style="margin-bottom:12px">
-  <a class="btn light sm" href="{{ url_for('staff.attendance', day=prev) }}">‹ {{ _('Prev') }}</a>
-  <a class="btn light sm" href="{{ url_for('staff.attendance') }}">{{ _('Today') }}</a>
-  <a class="btn light sm" href="{{ url_for('staff.attendance', day=nxt) }}">{{ _('Next') }} ›</a>
+  <a class="btn light sm" href="{{ url_for('staff.attendance', day=prev, staff_id=staff_id) }}">‹ {{ _('Prev') }}</a>
+  <a class="btn light sm" href="{{ url_for('staff.attendance', staff_id=staff_id) }}">{{ _('Today') }}</a>
+  <a class="btn light sm" href="{{ url_for('staff.attendance', day=nxt, staff_id=staff_id) }}">{{ _('Next') }} ›</a>
 </div>
-{% if people and can('staff.attendance_mark', 'POST') %}
+{% if people and not staff_id and can('staff.attendance_mark', 'POST') %}
 <form method="post" action="{{ url_for('staff.attendance_mark') }}" style="margin-bottom:12px">
   {{ csrf_input() }}
   <input type="hidden" name="day" value="{{ day.isoformat() }}"><input type="hidden" name="staff_id" value="all">

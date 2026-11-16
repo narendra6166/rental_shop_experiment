@@ -1,0 +1,13 @@
+<label for="period">{{ _('Period') }}</label>
+<select id="period" name="period">
+  {% for value, label in [('all', 'All dates'), ('month', 'Month'), ('range', 'Date range')] %}
+  <option value="{{ value }}" {{ 'selected' if window.period == value }}>{{ _(label) }}</option>
+  {% endfor %}
+</select>
+<label for="month">{{ _('Month') }}</label>
+<input id="month" type="month" name="month" value="{{ window.month }}">
+<div class="grid2">
+  <div><label for="from_date">{{ _('From') }}</label><input id="from_date" type="date" name="from_date" value="{{ window.from_date }}"></div>
+  <div><label for="to_date">{{ _('To') }}</label><input id="to_date" type="date" name="to_date" value="{{ window.to_date }}"></div>
+</div>
+<p class="muted">{{ _('Choose Month or Date range above to apply those dates.') }}</p>

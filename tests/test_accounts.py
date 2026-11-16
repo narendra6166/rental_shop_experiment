@@ -35,7 +35,7 @@ class AccountTests(unittest.TestCase):
         self.client = self.app.test_client()
         with self.app.app_context():
             db = self.db.get_db()
-            for table in ("work_assignments", "bookings", "customers", "users", "login_attempts"):
+            for table in ("work_assignments", "bookings", "customers", "staff", "users", "login_attempts"):
                 db.execute(f"DELETE FROM {table}")
             self.ids = {}
             for role in ("Owner", "Partner", "Agent", "Accounts", "Staff", "Worker"):
@@ -261,6 +261,80 @@ class AccountTests(unittest.TestCase):
         self.assertEqual(result.exit_code, 0, result.output)
         with self.app.app_context():
             self.assertEqual(self.db.get_db().execute("SELECT role FROM users").fetchone()[0], "Owner")
+
+    def test_booking_period_filters_preserve_tabs_and_overlap(self):
+        self.as_role("Owner")
+        with self.app.app_context():
+            db = self.db.get_db()
+            db.execute("UPDATE bookings SET start_date='2026-12-30',end_date='2027-01-03' WHERE id=?",
+                       (self.booking_id,))
+            db.commit()
+        for filters, expected in (
+            ({"period": "month", "month": "2027-01"}, True),
+            ({"period": "month", "month": "2027-02"}, False),
+            ({"period": "range", "from_date": "2027-01-03", "to_date": "2027-01-03"}, True),
+            ({"period": "all", "q": "no match"}, False),
+        ):
+            response = self.client.get("/bookings", query_string=filters)
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(f'href="/bookings/{self.booking_id}"' in response.get_data(as_text=True), expected)
+        response = self.client.get("/bookings?period=month&month=2027-01&q=Assigned")
+        self.assertIn(b"month=2027-01", response.data)
+        self.assertIn(b"q=assigned", response.data)
+        self.assertEqual(self.client.get("/bookings?period=month&month=2027-13").status_code, 400)
+        self.assertEqual(self.client.get("/bookings?period=range&from_date=2027-02-01&to_date=2027-01-01").status_code, 400)
+
+    def test_attendance_filters_history_totals_and_staff_search(self):
+        self.as_role("Owner")
+        with self.app.app_context():
+            db = self.db.get_db()
+            first = db.execute("INSERT INTO staff (name,role) VALUES ('Alice Helper','Helper')").lastrowid
+            second = db.execute("INSERT INTO staff (name,role,active) VALUES ('Bob Driver','Driver',0)").lastrowid
+            db.executemany("INSERT INTO attendance (staff_id,day,status) VALUES (?,?,?)", [
+                (first, "2027-01-01", "Present"), (first, "2027-01-02", "Half"),
+                (second, "2027-01-01", "Absent"), (second, "2027-02-01", "Leave"),
+            ])
+            db.commit()
+        response = self.client.get("/staff?q=alice&active=1")
+        self.assertIn(b"Alice Helper", response.data)
+        self.assertNotIn(b"Bob Driver", response.data)
+        response = self.client.get("/attendance/history", query_string={
+            "staff_id": first, "period": "month", "month": "2027-01",
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"2 records", response.data)
+        response = self.client.get("/attendance/history?period=all&q=alice&status=Half")
+        self.assertIn(b"1 records", response.data)
+        self.assertIn(b"02 Jan 2027", response.data)
+        response = self.client.get("/attendance/history?period=range&from_date=2027-02-01&to_date=2027-02-01")
+        self.assertIn(b"1 records", response.data)
+        self.assertIn(b"01 Feb 2027", response.data)
+        self.assertIn(b"4 records", self.client.get("/attendance/history?period=all").data)
+        response = self.client.get("/attendance", query_string={"day": "2027-01-01", "staff_id": first})
+        self.assertIn(b"Alice Helper", response.data)
+        self.assertNotIn(b"Mark everyone present", response.data)
+        for path in ("/attendance?day=invalid", "/attendance/history?staff_id=999999",
+                     "/attendance/history?status=wrong", "/attendance/history?page=-1"):
+            self.assertEqual(self.client.get(path).status_code, 400)
+        self.as_role("Partner")
+        self.assertEqual(self.client.get("/attendance/history").status_code, 200)
+        self.as_role("Worker")
+        self.assertEqual(self.client.get("/attendance/history").status_code, 403)
+
+    def test_language_page_only_contains_language_choices(self):
+        self.as_role("Owner")
+        self.assertIn(b'href="/language"', self.client.get("/").data)
+        for lang in ("en", "te", "hi"):
+            response = self.client.get(f"/lang/{lang}?next=/language", follow_redirects=True)
+            self.assertEqual(response.status_code, 200)
+            self.assertIn(f'<html lang="{lang}">'.encode(), response.data)
+            for label in ("English", "తెలుగు", "हिन्दी"):
+                self.assertIn(label.encode(), response.data)
+            self.assertNotIn(b"tabbar", response.data)
+            self.assertNotIn(b"/accounts", response.data)
+            self.assertNotIn(b"/backup", response.data)
+        self.as_role("Worker")
+        self.assertEqual(self.client.get("/language").status_code, 200)
 
 
 if __name__ == "__main__":

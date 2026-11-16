@@ -1,12 +1,13 @@
 import re
 from datetime import date
 
-from flask import Blueprint, flash, redirect, render_template, request, url_for
+from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 
 from db import (ID_TYPES, SALARY_KINDS, SALARY_TYPES, ATTENDANCE, get_db, parse_date, parse_month,
                 salary_summary, shift_month)
 from i18n import _
 from validation import valid_phone
+from filters import date_window
 
 staff_bp = Blueprint("staff", __name__)
 
@@ -20,7 +21,13 @@ def staff_list():
     db = get_db()
     today = date.today().isoformat()
     month = date.today().strftime("%Y-%m")
+    q = request.args.get("q", "").strip()
+    active = request.args.get("active", "all")
+    if active not in ("all", "1", "0"):
+        abort(400, description=_("Select a valid staff status."))
     rows = db.execute("SELECT * FROM staff ORDER BY active DESC, name").fetchall()
+    rows = [s for s in rows if (not q or q.casefold() in f"{s['name']} {s['phone'] or ''} {s['role']}".casefold())
+            and (active == "all" or str(s["active"]) == active)]
     people = []
     for s in rows:
         att = db.execute(
@@ -28,7 +35,7 @@ def staff_list():
         ).fetchone()
         people.append({"s": s, "today": att["status"] if att else None,
                        "sum": salary_summary(db, s, month)})
-    return render_template("staff.html", people=people, month=month)
+    return render_template("staff.html", people=people, month=month, q=q, active=active)
 
 
 @staff_bp.route("/staff/new", methods=["GET", "POST"])
@@ -147,13 +154,72 @@ def staff_pay_delete(staff_id, pay_id):
 @staff_bp.route("/attendance")
 def attendance():
     db = get_db()
-    day = parse_date(request.args.get("day")) or date.today()
+    day_s = request.args.get("day", date.today().isoformat())
+    day = parse_date(day_s)
+    if not day:
+        abort(400, description=_("Select a valid date."))
+    staff_id = selected_staff(db)
     people = db.execute("SELECT * FROM staff WHERE active = 1 ORDER BY name").fetchall()
+    staff_choices = people
+    if staff_id:
+        people = [p for p in people if str(p["id"]) == staff_id]
     marked = {
         r["staff_id"]: r["status"]
         for r in db.execute("SELECT staff_id, status FROM attendance WHERE day = ?", (day.isoformat(),))
     }
     return render_template("attendance.html", day=day, people=people, marked=marked,
+                           statuses=ATTENDANCE, staff_id=staff_id, staff_choices=staff_choices)
+
+
+def selected_staff(db):
+    staff_id = request.args.get("staff_id", "")
+    if staff_id and (not staff_id.isascii() or not staff_id.isdigit() or not db.execute(
+            "SELECT 1 FROM staff WHERE id=?", (staff_id,)).fetchone()):
+        abort(400, description=_("Select a valid staff member."))
+    return staff_id
+
+
+@staff_bp.route("/attendance/history")
+def attendance_history():
+    db = get_db()
+    window = date_window(request.args, default="month")
+    staff_id = selected_staff(db)
+    q = request.args.get("q", "").strip()
+    status = request.args.get("status", "")
+    if status and status not in ATTENDANCE:
+        abort(400, description=_("Select a valid attendance status."))
+    where, args = [], []
+    if staff_id:
+        where.append("a.staff_id=?")
+        args.append(staff_id)
+    if q:
+        where.append("instr(lower(s.name),lower(?)) > 0")
+        args.append(q)
+    if window["from_date"]:
+        where.append("a.day BETWEEN ? AND ?")
+        args.extend([window["from_date"], window["to_date"]])
+    if status:
+        where.append("a.status=?")
+        args.append(status)
+    clause = " WHERE " + " AND ".join(where) if where else ""
+    source = " FROM attendance a JOIN staff s ON s.id=a.staff_id" + clause
+    totals = {s: 0 for s in ATTENDANCE}
+    for row in db.execute("SELECT a.status,COUNT(*) AS n" + source + " GROUP BY a.status", args):
+        totals[row["status"]] = row["n"]
+    total = sum(totals.values())
+    raw_page = request.args.get("page", "1")
+    if not raw_page.isascii() or not raw_page.isdigit() or len(raw_page) > 9 or int(raw_page) < 1:
+        abort(400, description=_("Select a valid page."))
+    page = min(int(raw_page), max(1, (total + 49) // 50))
+    records = db.execute(
+        "SELECT a.*,s.name,s.role" + source + " ORDER BY a.day DESC,s.name,a.id LIMIT 50 OFFSET ?",
+        [*args, (page - 1) * 50],
+    ).fetchall()
+    choices = db.execute("SELECT id,name,active FROM staff ORDER BY active DESC,name").fetchall()
+    links = dict(window, staff_id=staff_id, q=q, status=status)
+    return render_template("attendance_history.html", records=records, totals=totals, total=total,
+                           page=page, has_next=page * 50 < total, links=links, window=window,
+                           staff_id=staff_id, staff_choices=choices, q=q, status=status,
                            statuses=ATTENDANCE)
 
 

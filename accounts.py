@@ -21,7 +21,7 @@ DUMMY_PASSWORD_HASH = generate_password_hash(secrets.token_urlsafe(32))
 READ_ENDPOINTS = {
     "dashboard", "bookings", "booking_view", "invoice", "customers", "items",
     "stock.stock", "stock.damages", "staff.staff_list", "staff.staff_view",
-    "staff.attendance", "expenses", "finance",
+    "staff.attendance", "staff.attendance_history", "expenses", "finance",
 }
 AGENT_ENDPOINTS = {
     "bookings", "booking_view", "invoice", "booking_new", "booking_status",
@@ -39,7 +39,7 @@ def allowed(endpoint, method="GET"):
     user = g.get("user")
     if not user:
         return False
-    if endpoint in {"more", "accounts.password", "accounts.logout"}:
+    if endpoint in {"more", "language", "accounts.password", "accounts.logout"}:
         return True
     if user["role"] == "Owner":
         return True

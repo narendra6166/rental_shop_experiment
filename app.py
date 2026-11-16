@@ -16,6 +16,7 @@ from db import (EVENT_TYPES, EXPENSE_CATEGORIES, PAYMENT_KINDS, STATUS_TABS, STA
 from staff import staff_bp
 from stock import stock_bp
 from validation import valid_phone
+from filters import date_window
 
 SHOP_NAME = os.environ.get("SHOP_NAME", "Ganesh Hyres")
 SHOP_ADDRESS = os.environ.get(
@@ -46,6 +47,11 @@ def set_language(code):
     if code in LANGS:
         resp.set_cookie("lang", code, max_age=60 * 60 * 24 * 365, samesite="Lax")
     return resp
+
+
+@app.route("/language")
+def language():
+    return render_template("language.html")
 
 
 @app.template_filter("money")
@@ -335,12 +341,19 @@ def customer_delete(customer_id):
 @app.route("/bookings")
 def bookings():
     tab = request.args.get("tab", "all")
+    if tab not in {t[0] for t in STATUS_TABS}:
+        tab = "all"
     q = request.args.get("q", "").strip().lower()
+    window = date_window(request.args)
     keys = {t[0]: t[2] for t in STATUS_TABS}.get(tab)
     rows = booking_rows()
     counts = {t[0]: 0 for t in STATUS_TABS}
     shown = []
     for b in rows:
+        if q and q not in f"{b['customer']} {b['phone']} {b['id']} {b['event_type']}".lower():
+            continue
+        if window["from_date"] and (b["end_date"] < window["from_date"] or b["start_date"] > window["to_date"]):
+            continue
         key = status_info(b)[2]
         counts["all"] += 1
         for t in STATUS_TABS[1:]:
@@ -348,13 +361,11 @@ def bookings():
                 counts[t[0]] += 1
         if keys and key not in keys:
             continue
-        if q and q not in f"{b['customer']} {b['phone']} {b['id']} {b['event_type']}".lower():
-            continue
         shown.append(b)
     # Active work first, finished ones last
     shown.sort(key=lambda b: (status_info(b)[2] in ("done", "cancelled"), b["start_date"]))
     return render_template("bookings.html", bookings=shown, tabs=STATUS_TABS,
-                           tab=tab, counts=counts, q=q)
+                           tab=tab, counts=counts, q=q, window=window)
 
 
 def money_field(form, name, errors, label):

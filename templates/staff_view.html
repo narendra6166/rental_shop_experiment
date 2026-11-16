@@ -22,7 +22,7 @@
   <div class="muted mt">{{ _('ID proof') }}</div><div>{% if p.id_type %}{{ _(p.id_type) }}: {{ p.id_number }}{% else %}—{% endif %}</div>
 </div>
 
-<div class="section"><h2>{{ _('Attendance') }}</h2>{% if can('staff.attendance') %}<a href="{{ url_for('staff.attendance') }}">{{ _('Attendance') }}</a>{% endif %}</div>
+<div class="section"><h2>{{ _('Attendance') }}</h2>{% if can('staff.attendance_history') %}<a href="{{ url_for('staff.attendance_history', staff_id=p.id, period='month', month=month) }}">{{ _('Attendance history') }}</a>{% endif %}</div>
 <div class="card">
   <div class="row wrapflex">
     <span class="pill green">{{ _('Present') }} {{ s.counts.Present }}</span><span class="pill orange">{{ _('Half') }} {{ s.counts.Half }}</span>

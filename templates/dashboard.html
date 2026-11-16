@@ -7,7 +7,7 @@
       <small>📅 {{ today()|ldate('%A, %d %B') }}</small>
       <div class="title">{{ _(shop_name) }}</div>
     </div>
-    <a class="circle" href="{{ url_for('more') }}#lang" title="{{ _('Language') }}">🌐</a>
+    <a class="circle" href="{{ url_for('language') }}" title="{{ _('Language') }}">🌐</a>
     <a class="circle" href="{{ url_for('more') }}">☰</a>
   </div>
   <div class="big">{{ _('Everything for your event.') }}</div>

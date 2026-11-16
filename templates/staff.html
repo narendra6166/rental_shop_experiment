@@ -6,6 +6,13 @@
 {% block hero_action %}{% if can('staff.attendance') %}<a class="circle" href="{{ url_for('staff.attendance') }}" title="{{ _('Attendance') }}">✅</a>{% endif %}{% endblock %}
 {% block fab %}{% if can('staff.staff_form') %}<a class="fab noprint" href="{{ url_for('staff.staff_form') }}">＋ {{ _('Staff') }}</a>{% endif %}{% endblock %}
 {% block content %}
+<form class="card" method="get">
+  <label for="q">{{ _('Search name, phone or role') }}</label><input id="q" name="q" value="{{ q }}">
+  <label for="active">{{ _('Status') }}</label>
+  <select id="active" name="active">{% for value, label in [('all', 'All'), ('1', 'Active'), ('0', 'Inactive')] %}<option value="{{ value }}" {{ 'selected' if active == value }}>{{ _(label) }}</option>{% endfor %}</select>
+  <div class="row wrapflex mt"><button class="btn">{{ _('Apply filters') }}</button><a class="btn light" href="{{ url_for('staff.staff_list') }}">{{ _('Reset') }}</a></div>
+</form>
+{% if can('staff.attendance_history') %}<a class="btn light block" href="{{ url_for('staff.attendance_history') }}" style="margin-bottom:12px">{{ _('Attendance history') }}</a>{% endif %}
 {% if can('staff.attendance') %}<a class="btn light block" href="{{ url_for('staff.attendance') }}" style="margin-bottom:12px">✅ {{ _('Attendance') }}</a>{% endif %}
 {% for p in people %}
 <a class="card" href="{{ url_for('staff.staff_view', staff_id=p.s.id) }}" style="{{ 'opacity:.55' if not p.s.active }}">

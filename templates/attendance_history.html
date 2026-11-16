@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}{{ _('Attendance history') }}{% endblock %}
+{% block fab %}{% endblock %}
+{% block content %}
+<div class="row wrapflex" style="margin-bottom:12px">
+  <a class="btn light" href="{{ url_for('staff.staff_list') }}">{{ _('Staff') }}</a>
+  <a class="btn light" href="{{ url_for('staff.attendance') }}">{{ _('Attendance') }}</a>
+</div>
+<form class="card" method="get">
+  <label for="q">{{ _('Search staff name') }}</label><input id="q" name="q" value="{{ q }}">
+  <label for="staff_id">{{ _('Staff member') }}</label>
+  <select id="staff_id" name="staff_id">
+    <option value="">{{ _('All staff') }}</option>
+    {% for person in staff_choices %}<option value="{{ person.id }}" {{ 'selected' if staff_id == person.id|string }}>{{ person.name }}{% if not person.active %} · {{ _('Inactive') }}{% endif %}</option>{% endfor %}
+  </select>
+  {% include "_date_filters.html" %}
+  <label for="status">{{ _('Status') }}</label>
+  <select id="status" name="status"><option value="">{{ _('All') }}</option>{% for value in statuses %}<option value="{{ value }}" {{ 'selected' if status == value }}>{{ _('Half day') if value == 'Half' else _(value) }}</option>{% endfor %}</select>
+  <div class="row wrapflex mt"><button class="btn">{{ _('Apply filters') }}</button><a class="btn light" href="{{ url_for('staff.attendance_history') }}">{{ _('Reset') }}</a></div>
+</form>
+<div class="stats">
+  {% for value, count in totals.items() %}<div class="stat"><b>{{ count }}</b><span>{{ _('Half day') if value == 'Half' else _(value) }}</span></div>{% endfor %}
+</div>
+<p class="muted">{{ _('Recorded attendance only; unmarked dates are not counted as absent.') }}</p>
+<p>{{ _('{n} records', n=total) }}</p>
+{% for record in records %}
+<div class="card row between">
+  <div class="grow"><strong>{{ record.name }}</strong><div class="muted">{{ record.day|dmy('%d %b %Y') }} · {{ record.role }}</div></div>
+  <span class="pill {{ {'Present':'green','Half':'orange','Absent':'red','Leave':'purple'}[record.status] }}">{{ _('Half day') if record.status == 'Half' else _(record.status) }}</span>
+</div>
+{% else %}<div class="card muted">{{ _('No attendance records match these filters.') }}</div>{% endfor %}
+<div class="row between">
+  {% if page > 1 %}<a class="btn light" href="{{ url_for('staff.attendance_history', page=page-1, **links) }}">{{ _('Prev') }}</a>{% endif %}
+  <span>{{ _('Page {n}', n=page) }}</span>
+  {% if has_next %}<a class="btn light" href="{{ url_for('staff.attendance_history', page=page+1, **links) }}">{{ _('Next') }}</a>{% endif %}
+</div>
+{% endblock %}
