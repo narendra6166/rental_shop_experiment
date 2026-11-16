@@ -17,6 +17,7 @@ Open http://127.0.0.1:5000. The SQLite database (`rental.db`) is created with sa
 Set `SECRET_KEY` in the environment for production. 
 
 Optional environment variables:
+- `APP_USER` - login ID (default `admin`).
 - `APP_PASSWORD` - turns on a login page (recommended if the app is reachable by anyone else).
 - `SHOP_NAME`, `SHOP_ADDRESS`, `SHOP_PHONE` - shown on the invoice.
 - `BACKUP_DIR` - the app saves a copy of the database once a day in `backups/` (last 14 kept); More > Download backup gives you a copy any time.
