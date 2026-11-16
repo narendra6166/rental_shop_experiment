@@ -112,7 +112,9 @@ SAMPLE_ITEMS = [
 ]
 
 EVENT_TYPES = ["Marriage", "Birthday", "Engagement", "Housewarming", "Party", "Other"]
-STATUSES = ["Booked", "Delivered", "Returned", "Cancelled"]
+# Delivered = work started; WorkDone = work finished, items not yet back; Returned = items back.
+STATUSES = ["Booked", "Delivered", "WorkDone", "Returned", "Cancelled"]
+OUT_STATUSES = ("Delivered", "WorkDone")
 PAYMENT_KINDS = ["Advance", "Payment", "Deposit refund"]
 ATTENDANCE = ["Present", "Half", "Absent", "Leave"]
 SALARY_KINDS = ["Salary", "Advance", "Bonus"]
@@ -130,6 +132,11 @@ MIGRATIONS = {
         ("id_type", "TEXT"),
         ("id_number", "TEXT"),
     ],
+    "bookings": [
+        ("travel_charge", "REAL NOT NULL DEFAULT 0"),
+        ("labour_charge", "REAL NOT NULL DEFAULT 0"),
+        ("damage_charge", "REAL NOT NULL DEFAULT 0"),
+    ],
 }
 
 # Filter tabs on the bookings page -> derived status keys
@@ -137,7 +144,8 @@ STATUS_TABS = [
     ("all", "All", None),
     ("soon", "Starts soon", ("pending", "today", "soon")),
     ("upcoming", "Upcoming", ("upcoming",)),
-    ("onwork", "On work", ("onwork", "overdue")),
+    ("onwork", "On work", ("onwork", "overdue", "workdone")),
+    ("payment", "Payment due", ("payment",)),
     ("done", "Completed", ("done",)),
     ("cancelled", "Cancelled", ("cancelled",)),
 ]
@@ -209,7 +217,7 @@ def booked_qty(db, item_id, start, end, exclude_booking=None):
     rows = db.execute(
         """SELECT b.start_date, b.end_date, b.status, bi.qty FROM booking_items bi
            JOIN bookings b ON b.id = bi.booking_id
-           WHERE bi.item_id = ? AND b.status IN ('Booked', 'Delivered')
+           WHERE bi.item_id = ? AND b.status IN ('Booked', 'Delivered', 'WorkDone')
              AND b.start_date <= ? AND b.id IS NOT ?""",
         (item_id, end, exclude_booking),
     ).fetchall()
@@ -217,7 +225,7 @@ def booked_qty(db, item_id, start, end, exclude_booking=None):
     spans = []
     for r in rows:
         last = r["end_date"]
-        if r["status"] == "Delivered" and last < today:
+        if r["status"] in OUT_STATUSES and last < today:
             last = today
         if last >= start:
             spans.append((r["start_date"], last, r["qty"]))
@@ -237,8 +245,9 @@ def damaged_open(db, item_id):
     ).fetchone()[0]
 
 
-def available_qty(db, item, start, end):
-    return item["total_qty"] - damaged_open(db, item["id"]) - booked_qty(db, item["id"], start, end)
+def available_qty(db, item, start, end, exclude_booking=None):
+    return (item["total_qty"] - damaged_open(db, item["id"])
+            - booked_qty(db, item["id"], start, end, exclude_booking))
 
 
 # ---------- Bookings ----------
@@ -249,8 +258,15 @@ def status_info(b, today=None):
     if st == "Cancelled":
         return "Cancelled", "grey", "cancelled"
     if st == "Returned":
+        # "balance" is attached by booking_rows; Completed means fully paid.
+        if b["balance"] > 0 if "balance" in b.keys() else False:
+            return "Payment pending", "orange", "payment"
         return "Completed", "green", "done"
     start, end = parse_date(b["start_date"]), parse_date(b["end_date"])
+    if st == "WorkDone":
+        if end < today:
+            return "Overdue return", "red", "overdue"
+        return "Work done, return pending", "blue", "workdone"
     if st == "Delivered":
         if end < today:
             return "Overdue return", "red", "overdue"
@@ -280,14 +296,15 @@ def booking_totals(db, booking_id):
     ).fetchall()
     rent = sum(l["qty"] * l["rate"] * days for l in lines)
     deposit = sum(l["qty"] * l["deposit"] for l in lines)
-    damage = sum(d["charge"] for d in damages)
+    damage = sum(d["charge"] for d in damages) + b["damage_charge"]
+    travel, labour = b["travel_charge"], b["labour_charge"]
     payments = db.execute(
         "SELECT * FROM payments WHERE booking_id = ? ORDER BY id", (booking_id,)
     ).fetchall()
     paid = sum(p["amount"] for p in payments if p["kind"] != "Deposit refund")
     refunded = sum(p["amount"] for p in payments if p["kind"] == "Deposit refund")
     net_rent = max(rent - b["discount"], 0)
-    charges = net_rent + damage
+    charges = net_rent + damage + travel + labour
     # Deposit is no longer owed once the items are back; it then only appears as a refund.
     returned = b["status"] == "Returned"
     cancelled = b["status"] == "Cancelled"
@@ -296,7 +313,7 @@ def booking_totals(db, booking_id):
     return {
         "days": days, "lines": lines, "damages": damages, "rent": rent,
         "discount": b["discount"], "net_rent": net_rent, "deposit": deposit,
-        "damage": damage, "charges": charges, "total": total, "paid": paid,
+        "damage": damage, "travel": travel, "labour": labour, "charges": charges, "total": total, "paid": paid,
         "refunded": refunded, "net_paid": net_paid, "deposit_returned": returned,
         # > 0: customer still owes this; < 0: shop owes the customer a refund
         "balance": total - net_paid, "payments": payments,

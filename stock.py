@@ -25,21 +25,28 @@ def stock():
         out_now = db.execute(
             """SELECT COALESCE(SUM(bi.qty), 0) FROM booking_items bi
                JOIN bookings b ON b.id = bi.booking_id
-               WHERE bi.item_id = ? AND b.status = 'Delivered'""",
+               WHERE bi.item_id = ? AND b.status IN ('Delivered', 'WorkDone')""",
             (i["id"],),
         ).fetchone()[0]
+        upcoming = db.execute(
+            """SELECT COALESCE(SUM(bi.qty), 0) FROM booking_items bi
+               JOIN bookings b ON b.id = bi.booking_id
+               WHERE bi.item_id = ? AND b.status = 'Booked' AND b.end_date >= ?""",
+            (i["id"], today),
+        ).fetchone()[0]
         free = i["total_qty"] - damaged - reserved
-        rows.append({"i": i, "reserved": reserved, "damaged": damaged, "out_now": out_now,
+        rows.append({"i": i, "reserved": reserved, "damaged": damaged, "out_now": out_now, "upcoming": upcoming,
                      "free": free})
     pending = db.execute(
         """SELECT b.id, b.end_date, b.start_date, c.name AS customer, c.phone,
                   GROUP_CONCAT(i.name || ' × ' || bi.qty, ', ') AS items, SUM(bi.qty) AS qty
            FROM bookings b JOIN customers c ON c.id = b.customer_id
            JOIN booking_items bi ON bi.booking_id = b.id JOIN items i ON i.id = bi.item_id
-           WHERE b.status = 'Delivered' GROUP BY b.id ORDER BY b.end_date""").fetchall()
+           WHERE b.status IN ('Delivered', 'WorkDone') GROUP BY b.id ORDER BY b.end_date""").fetchall()
     summary = {
         "total": sum(r["i"]["total_qty"] for r in rows),
         "on_rent": sum(r["out_now"] for r in rows),
+        "upcoming": sum(r["upcoming"] for r in rows),
         "damaged": sum(r["damaged"] for r in rows),
         "free": sum(max(r["free"], 0) for r in rows),
     }

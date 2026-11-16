@@ -19,6 +19,8 @@
     <tr><td colspan="3">{{ _('Rent') }}</td><td class="num">{{ t.rent|money }}</td></tr>
     {% if t.discount %}<tr><td colspan="3">{{ _('Discount') }}</td><td class="num">-{{ t.discount|money }}</td></tr>{% endif %}
     <tr><td colspan="3">{{ _('Refundable deposit') }}{% if t.deposit_returned %} ({{ _('returned separately') }}){% endif %}</td><td class="num">{{ t.deposit|money }}</td></tr>
+    {% if t.travel %}<tr><td colspan="3">{{ _('Travel charges') }}</td><td class="num">{{ t.travel|money }}</td></tr>{% endif %}
+    {% if t.labour %}<tr><td colspan="3">{{ _('Labour charges') }}</td><td class="num">{{ t.labour|money }}</td></tr>{% endif %}
     {% if t.damage %}<tr><td colspan="3">{{ _('Damage charges') }}</td><td class="num">{{ t.damage|money }}</td></tr>{% endif %}
     <tr class="total"><td colspan="3">{{ _('Total') }}</td><td class="num">{{ t.total|money }}</td></tr>
     <tr><td colspan="3">{{ _('Paid') }}</td><td class="num">{{ t.paid|money }}</td></tr>

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}{{ _('New booking') }}{% endblock %}
+{% block title %}{{ _('Edit booking') if editing else _('New booking') }}{% endblock %}
 {% block fab %}{% endblock %}
 {% block content %}
 <form method="post">
@@ -18,7 +18,7 @@
       <div><label>{{ _('Start date') }}</label><input type="date" name="start_date" required value="{{ form.get('start_date', '') }}"></div>
       <div><label>{{ _('End date') }}</label><input type="date" name="end_date" required value="{{ form.get('end_date', '') }}"></div>
     </div>
-    <button class="btn light block mt" type="submit" formmethod="get" formaction="{{ url_for('booking_new') }}">{{ _('Check stock for these dates') }}</button>
+    <button class="btn light block mt" type="submit" formmethod="get" formaction="{{ url_for('booking_new', booking_id=editing.id) if editing else url_for('booking_new') }}">{{ _('Check stock for these dates') }}</button>
   </div>
 
   <div class="section"><h2>{{ _('Items') }}</h2>{% if not avail %}<span class="muted">{{ _('Pick dates to see availability') }}</span>{% endif %}</div>
@@ -35,10 +35,15 @@
   <div class="card">
     <div class="grid2">
       <div><label style="margin-top:0">{{ _('Discount (₹)') }}</label><input type="number" inputmode="decimal" min="0" step="0.01" name="discount" value="{{ form.get('discount', 0) }}"></div>
-      <div><label style="margin-top:0">{{ _('Advance paid (₹)') }}</label><input type="number" inputmode="decimal" min="0" step="0.01" name="advance" value="{{ form.get('advance', 0) }}"></div>
+      {% if not editing %}<div><label style="margin-top:0">{{ _('Advance paid (₹)') }}</label><input type="number" inputmode="decimal" min="0" step="0.01" name="advance" value="{{ form.get('advance', 0) }}"></div>{% endif %}
     </div>
+    <div class="grid2">
+      <div><label>{{ _('Travel charges (₹)') }}</label><input type="number" inputmode="decimal" min="0" step="0.01" name="travel_charge" value="{{ form.get('travel_charge', 0) }}"></div>
+      <div><label>{{ _('Labour charges (₹)') }}</label><input type="number" inputmode="decimal" min="0" step="0.01" name="labour_charge" value="{{ form.get('labour_charge', 0) }}"></div>
+    </div>
+    <label>{{ _('Damage charges (₹)') }}</label><input type="number" inputmode="decimal" min="0" step="0.01" name="damage_charge" value="{{ form.get('damage_charge', 0) }}">
     <label>{{ _('Notes (venue, delivery time...)') }}</label><textarea name="notes" rows="2">{{ form.get('notes', '') }}</textarea>
   </div>
-  <button class="btn block">{{ _('Create booking') }}</button>
+  <button class="btn block">{{ _('Save changes') if editing else _('Create booking') }}</button>
 </form>
 {% endblock %}

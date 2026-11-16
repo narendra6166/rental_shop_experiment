@@ -2,7 +2,7 @@
 {% from "_macros.html" import pill %}
 {% block title %}{{ _('Booking #{n}', n=b.id) }}{% endblock %}
 {% block subtitle %}<small>{{ b.customer }}</small>{% endblock %}
-{% block hero_action %}{{ pill(b) }}{% endblock %}
+{% block hero_action %}<a class="circle" href="{{ url_for('booking_new', booking_id=b.id) }}" title="{{ _('Edit') }}">✏️</a>{{ pill(b) }}{% endblock %}
 {% block fab %}{% endblock %}
 {% block content %}
 {% set key = status_info(b)[2] %}
@@ -20,14 +20,13 @@
 <div class="card">
   <div class="muted" style="margin-bottom:8px">{{ _('Update progress') }}</div>
   <div class="grid2">
-    {% if b.status == 'Booked' %}
-      <form method="post" action="{{ url_for('booking_status', booking_id=b.id) }}"><input type="hidden" name="status" value="Delivered"><button class="btn block">🚚 {{ _('Start work') }}</button></form>
-    {% elif b.status == 'Delivered' %}
-      <form method="post" action="{{ url_for('booking_status', booking_id=b.id) }}"><input type="hidden" name="status" value="Returned"><button class="btn green block">✅ {{ _('Mark completed') }}</button></form>
+    {% set nxt = {'Booked': ('Delivered', '🚚', 'Start work', ''), 'Delivered': ('WorkDone', '🎉', 'Work completed', ''), 'WorkDone': ('Returned', '📦', 'Return completed', 'green')} %}
+    {% if b.status in nxt %}{% set n = nxt[b.status] %}
+      <form method="post" action="{{ url_for('booking_status', booking_id=b.id) }}"><input type="hidden" name="status" value="{{ n[0] }}"><button class="btn {{ n[3] }} block">{{ n[1] }} {{ _(n[2]) }}</button></form>
     {% else %}
       <form method="post" action="{{ url_for('booking_status', booking_id=b.id) }}"><input type="hidden" name="status" value="Booked"><button class="btn light block">↩ {{ _('Reopen') }}</button></form>
     {% endif %}
-    {% if b.status in ('Booked', 'Delivered') %}
+    {% if b.status in ('Booked', 'Delivered', 'WorkDone') %}
       <form method="post" action="{{ url_for('booking_status', booking_id=b.id) }}" onsubmit="return confirm({{ _('Cancel this booking?')|tojson|forceescape }})"><input type="hidden" name="status" value="Cancelled"><button class="btn danger block">{{ _('Cancel') }}</button></form>
     {% endif %}
   </div>
@@ -49,6 +48,8 @@
     <tr><td>{{ _('Rent') }}</td><td class="num">{{ t.rent|money }}</td></tr>
     {% if t.discount %}<tr><td>{{ _('Discount') }}</td><td class="num">-{{ t.discount|money }}</td></tr>{% endif %}
     <tr><td>{{ _('Refundable deposit') }}{% if t.deposit_returned %} ({{ _('returned separately') }}){% endif %}</td><td class="num">{{ t.deposit|money }}</td></tr>
+    {% if t.travel %}<tr><td>{{ _('Travel charges') }}</td><td class="num">{{ t.travel|money }}</td></tr>{% endif %}
+    {% if t.labour %}<tr><td>{{ _('Labour charges') }}</td><td class="num">{{ t.labour|money }}</td></tr>{% endif %}
     {% if t.damage %}<tr><td>{{ _('Damage charges') }}</td><td class="num">{{ t.damage|money }}</td></tr>{% endif %}
     <tr class="total"><td>{{ _('Total') }}</td><td class="num">{{ t.total|money }}</td></tr>
     <tr><td>{{ _('Paid') }}</td><td class="num">{{ t.paid|money }}</td></tr>
