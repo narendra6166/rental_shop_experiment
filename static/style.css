@@ -6,7 +6,7 @@
 }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: var(--bg);
-  color: var(--ink); padding-bottom: 92px; }
+  color: var(--ink); padding-bottom: 150px; }
 a { color: inherit; text-decoration: none; }
 h1, h2, h3 { margin: 0; }
 .wrap { max-width: 640px; margin: 0 auto; padding: 0 16px; }
