@@ -2,7 +2,7 @@
 {% from "_macros.html" import pill %}
 {% block title %}{{ _('Booking #{n}', n=b.id) }}{% endblock %}
 {% block subtitle %}<small>{{ b.customer }}</small>{% endblock %}
-{% block hero_action %}<a class="circle" href="{{ url_for('booking_new', booking_id=b.id) }}" title="{{ _('Edit') }}">✏️</a>{{ pill(b) }}{% endblock %}
+{% block hero_action %}{% if can('booking_new') %}<a class="circle" href="{{ url_for('booking_new', booking_id=b.id) }}" title="{{ _('Edit') }}">✏️</a>{% endif %}{{ pill(b) }}{% endblock %}
 {% block fab %}{% endblock %}
 {% block content %}
 {% set key = status_info(b)[2] %}
@@ -17,16 +17,17 @@
   {% if b.notes %}<div class="muted mt">📝 {{ b.notes }}</div>{% endif %}
 </div>
 
-<div class="card">
+{% if can('booking_status', 'POST') %}<div class="card">
   <div class="muted" style="margin-bottom:8px">{{ _('Update progress') }}</div>
   {% set stages = [('Booked', '📅', 'Booked'), ('Delivered', '🚚', 'Work started'), ('WorkDone', '🎉', 'Work completed'), ('Returned', '📦', 'Return completed'), ('Cancelled', '✖', 'Cancelled')] %}
   <form method="post" action="{{ url_for('booking_status', booking_id=b.id) }}">
+    {{ csrf_input() }}
     <select name="status">
       {% for v, icon, label in stages %}<option value="{{ v }}" {{ 'selected' if b.status == v }}>{{ icon }} {{ _(label) }}</option>{% endfor %}
     </select>
     <button class="btn block mt">{{ _('Update status') }}</button>
   </form>
-</div>
+</div>{% endif %}
 
 <div class="section"><h2>{{ _('Items') }}</h2></div>
 <div class="card">
@@ -56,8 +57,9 @@
     {% if t.refunded %}<tr><td>{{ _('Refunded') }}</td><td class="num">-{{ t.refunded|money }}</td></tr>{% endif %}
     <tr class="total"><td>{{ _('Deposit to refund') if t.balance < 0 else _('Balance due') }}</td><td class="num" style="color:{{ 'var(--red)' if t.balance > 0 else 'var(--green)' }}">{{ t.balance|abs|money }}</td></tr>
   </table>
-  {% if t.cancelled %}
+  {% if t.cancelled and can('booking_cancel_fee', 'POST') %}
   <form method="post" action="{{ url_for('booking_cancel_fee', booking_id=b.id) }}" class="mt">
+    {{ csrf_input() }}
     <label style="margin-top:0">{{ _('Cancellation fee kept by shop (₹)') }}</label>
     <div class="grid2"><input type="number" inputmode="decimal" min="0" step="0.01" name="cancel_fee" value="{{ t.cancel_fee }}">
       <button class="btn light">{{ _('Save') }}</button></div>
@@ -69,21 +71,41 @@
 <div class="section"><h2>{{ _('Payments') }}</h2></div>
 <div class="card">
   {% for p in t.payments %}<div class="row between" style="padding:4px 0"><span>{{ p.paid_on|dmy }} · {{ _(p.kind) }}</span><b>{{ p.amount|money }}</b></div>{% else %}<div class="muted">{{ _('No payments yet') }}</div>{% endfor %}
-  <form method="post" action="{{ url_for('booking_payment', booking_id=b.id) }}" class="mt">
+  {% if can('booking_payment', 'POST') %}<form method="post" action="{{ url_for('booking_payment', booking_id=b.id) }}" class="mt">
+    {{ csrf_input() }}
     <div class="grid2">
       <input type="number" inputmode="decimal" name="amount" min="0.01" step="0.01" placeholder="{{ _('Amount ₹') }}" required>
       <select name="kind">{% for k in kinds %}<option value="{{ k }}">{{ _(k) }}</option>{% endfor %}</select>
     </div>
     <button class="btn light block mt">{{ _('Add payment') }}</button>
-  </form>
+  </form>{% endif %}
 </div>
 
-<div class="section"><h2>{{ _('Damages') }}</h2><a href="{{ url_for('stock.damage_new', booking_id=b.id) }}">＋ {{ _('Report') }}</a></div>
+<div class="section"><h2>{{ _('Damages') }}</h2>{% if can('stock.damage_new') %}<a href="{{ url_for('stock.damage_new', booking_id=b.id) }}">＋ {{ _('Report') }}</a>{% endif %}</div>
 {% for d in t.damages %}
 <div class="card row between"><div><strong>{{ d.name }} × {{ d.qty }}</strong><div class="muted">{{ _(d.kind) }}{% if d.note %} · {{ d.note }}{% endif %}</div></div><b>{{ d.charge|money }}</b></div>
 {% else %}<div class="muted" style="margin:0 2px 12px">{{ _('No damage reported') }}</div>{% endfor %}
 
-<form method="post" action="{{ url_for('booking_delete', booking_id=b.id) }}" onsubmit="return confirm({{ _('Delete this booking permanently?')|tojson|forceescape }})" class="noprint">
+<div class="section"><h2>{{ _('Work assignments') }}</h2></div>
+<div class="card">
+  {% for assignment in assignments %}
+  <div class="row between mt">
+    <div class="grow"><strong>{{ assignment.name }}</strong> · {{ _(assignment.status) }}<div class="muted">{{ assignment.task }}</div></div>
+    {% if can('accounts.unassign', 'POST') %}<form method="post" action="{{ url_for('accounts.unassign', assignment_id=assignment.id) }}">{{ csrf_input() }}<button class="btn danger sm">{{ _('Remove') }}</button></form>{% endif %}
+  </div>
+  {% else %}<div class="muted">{{ _('No work assigned yet.') }}</div>{% endfor %}
+  {% if can('accounts.assign', 'POST') %}
+  <form method="post" action="{{ url_for('accounts.assign', booking_id=b.id) }}">
+    {{ csrf_input() }}
+    <label for="worker">{{ _('Staff / worker account') }}</label>
+    <select id="worker" name="user_id" required><option value="">{{ _('Select account') }}</option>{% for worker in workers %}<option value="{{ worker.id }}">{{ worker.name }} · {{ _(worker.role) }}</option>{% endfor %}</select>
+    <label for="task">{{ _('Task') }}</label><textarea id="task" name="task" required maxlength="500" rows="2"></textarea>
+    <button class="btn light block mt">{{ _('Assign work') }}</button>
+  </form>
+  {% endif %}
+</div>
+{% if can('booking_delete', 'POST') %}<form method="post" action="{{ url_for('booking_delete', booking_id=b.id) }}" onsubmit="return confirm({{ _('Delete this booking permanently?')|tojson|forceescape }})" class="noprint">
+  {{ csrf_input() }}
   <button class="btn danger block">{{ _('Delete booking') }}</button>
-</form>
+</form>{% endif %}
 {% endblock %}

@@ -6,10 +6,11 @@
 {% block nav %}{% endblock %}
 {% block content %}
 <form method="post" class="card">
-  <label style="margin-top:0">{{ _('ID') }}</label>
-  <input name="user" required autofocus autocomplete="username" autocapitalize="none">
-  <label>{{ _('Password') }}</label>
-  <input type="password" name="password" required autocomplete="current-password">
+  {{ csrf_input() }}
+  <label for="user" style="margin-top:0">{{ _('Username') }}</label>
+  <input id="user" name="user" required autofocus autocomplete="username" autocapitalize="none">
+  <label for="password">{{ _('Password') }}</label>
+  <input id="password" type="password" name="password" required autocomplete="current-password">
   <button class="btn block mt">{{ _('Login') }}</button>
 </form>
 {% endblock %}

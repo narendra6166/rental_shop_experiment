@@ -3,6 +3,7 @@
 {% block fab %}{% endblock %}
 {% block content %}
 <form method="post" class="card">
+  {{ csrf_input() }}
   <label style="margin-top:0">{{ _('Category') }}</label>
   <select name="category" id="cat" onchange="document.getElementById('buy').style.display = this.value === {{ stock_purchase|tojson|forceescape }} ? 'block' : 'none'">
     {% for c in categories %}<option value="{{ c }}" {{ 'selected' if form.get('category') == c }}>{{ _(c) }}</option>{% endfor %}

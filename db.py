@@ -9,6 +9,20 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.environ.get("RENTAL_DB", os.path.join(BASE_DIR, "rental.db"))
 
 SCHEMA = """
+CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT NOT NULL COLLATE NOCASE UNIQUE,
+    name TEXT NOT NULL,
+    password_hash TEXT NOT NULL,
+    role TEXT NOT NULL CHECK (role IN ('Owner', 'Partner', 'Agent', 'Accounts', 'Staff', 'Worker')),
+    active INTEGER NOT NULL DEFAULT 1,
+    session_version INTEGER NOT NULL DEFAULT 1
+);
+CREATE TABLE IF NOT EXISTS login_attempts (
+    address TEXT PRIMARY KEY,
+    failures INTEGER NOT NULL,
+    started_at REAL NOT NULL
+);
 CREATE TABLE IF NOT EXISTS items (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
@@ -41,6 +55,14 @@ CREATE TABLE IF NOT EXISTS booking_items (
     qty INTEGER NOT NULL CHECK (qty > 0),
     rate REAL NOT NULL,
     deposit REAL NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS work_assignments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    booking_id INTEGER NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    task TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'Assigned' CHECK (status IN ('Assigned', 'In progress', 'Done')),
+    UNIQUE (booking_id, user_id)
 );
 CREATE TABLE IF NOT EXISTS payments (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

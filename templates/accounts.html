@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}{{ _('Team accounts') }}{% endblock %}
+{% block fab %}{% endblock %}
+{% block content %}
+<a class="btn block" href="{{ url_for('accounts.user_form') }}">{{ _('Add account') }}</a>
+{% for person in users %}
+<div class="card mt row between">
+  <div><strong>{{ person.name }}</strong><div class="muted">{{ person.username }} · {{ _(person.role) }} · {{ _('Active') if person.active else _('Inactive') }}</div></div>
+  <a class="btn light sm" href="{{ url_for('accounts.user_form', user_id=person.id) }}">{{ _('Edit') }}</a>
+</div>
+{% endfor %}
+{% endblock %}

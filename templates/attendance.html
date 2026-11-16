@@ -11,8 +11,9 @@
   <a class="btn light sm" href="{{ url_for('staff.attendance') }}">{{ _('Today') }}</a>
   <a class="btn light sm" href="{{ url_for('staff.attendance', day=nxt) }}">{{ _('Next') }} ›</a>
 </div>
-{% if people %}
+{% if people and can('staff.attendance_mark', 'POST') %}
 <form method="post" action="{{ url_for('staff.attendance_mark') }}" style="margin-bottom:12px">
+  {{ csrf_input() }}
   <input type="hidden" name="day" value="{{ day.isoformat() }}"><input type="hidden" name="staff_id" value="all">
   <button class="btn green block" name="status" value="Present">{{ _('Mark everyone present') }}</button>
 </form>
@@ -20,12 +21,13 @@
 {% for p in people %}
 <div class="card">
   <div class="row"><div class="avatar">{{ p.name[:1]|upper }}</div><div class="grow"><strong>{{ p.name }}</strong><div class="muted">{{ p.role }}</div></div></div>
-  <form method="post" action="{{ url_for('staff.attendance_mark') }}" class="seg">
+  {% if can('staff.attendance_mark', 'POST') %}<form method="post" action="{{ url_for('staff.attendance_mark') }}" class="seg">
+    {{ csrf_input() }}
     <input type="hidden" name="day" value="{{ day.isoformat() }}"><input type="hidden" name="staff_id" value="{{ p.id }}">
     {% for s in statuses %}
     <button name="status" value="{{ s }}" class="{{ 'on-' ~ s if marked.get(p.id) == s }}">{{ _('Half day') if s == 'Half' else _(s) }}</button>
     {% endfor %}
-  </form>
+  </form>{% else %}<div class="muted mt">{{ _(marked.get(p.id, 'Not marked')) }}</div>{% endif %}
 </div>
 {% else %}{{ empty('👷', _('Add staff first')) }}{% endfor %}
 {% endblock %}

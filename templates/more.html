@@ -1,24 +1,25 @@
 {% extends "base.html" %}
-{% block back %}{% if login_enabled %}<a class="card row" href="{{ url_for('logout') }}"><span style="font-size:1.6rem">🔒</span><div class="grow"><strong>{{ _('Log out') }}</strong></div>›</a>{% endif %}
-{% endblock %}
-{% block title %}{{ _('More') }}{% if login_enabled %}<a class="card row" href="{{ url_for('logout') }}"><span style="font-size:1.6rem">🔒</span><div class="grow"><strong>{{ _('Log out') }}</strong></div>›</a>{% endif %}
-{% endblock %}
+{% block back %}{% endblock %}
+{% block title %}{{ _('More') }}{% endblock %}
+{% block fab %}{% endblock %}
 {% block content %}
+<div class="card"><strong>{{ current_user.name }}</strong><div class="muted">{{ current_user.username }} · {{ _(current_user.role) }}</div></div>
 <div class="card" id="lang">
   <strong>🌐 {{ _('Language') }}</strong>
-  <div class="chips mt" style="padding-bottom:0">
+  <div class="chips mt">
     {% for code, label in langs.items() %}
     <a class="chip {{ 'on' if code == get_lang() }}" href="{{ url_for('set_language', code=code, next=url_for('more')) }}">{{ label }}</a>
     {% endfor %}
   </div>
 </div>
-<a class="card row" href="{{ url_for('items') }}"><span style="font-size:1.6rem">🏷️</span><div class="grow"><strong>{{ _('Inventory & prices') }}</strong><div class="muted">{{ _('Add or edit items, rates, deposits') }}</div></div>›</a>
-<a class="card row" href="{{ url_for('customers') }}"><span style="font-size:1.6rem">🧑‍🤝‍🧑</span><div class="grow"><strong>{{ _('Customers') }}</strong><div class="muted">{{ _('Search and add customers') }}</div></div>›</a>
-<a class="card row" href="{{ url_for('stock.damages') }}"><span style="font-size:1.6rem">🛠️</span><div class="grow"><strong>{{ _('Damaged & lost items') }}</strong><div class="muted">{{ _('Repairs, write-offs, charges') }}</div></div>›</a>
-<a class="card row" href="{{ url_for('staff.attendance') }}"><span style="font-size:1.6rem">✅</span><div class="grow"><strong>{{ _('Attendance') }}</strong><div class="muted">{{ _('Mark staff present / absent') }}</div></div>›</a>
-<a class="card row" href="{{ url_for('staff.staff_list') }}"><span style="font-size:1.6rem">💰</span><div class="grow"><strong>{{ _('Staff & salaries') }}</strong><div class="muted">{{ _('Salary due, advances, payments') }}</div></div>›</a>
-<a class="card row" href="{{ url_for('expenses') }}"><span style="font-size:1.6rem">🧾</span><div class="grow"><strong>{{ _('Expenses') }}</strong><div class="muted">{{ _('Shop rent, new stock purchases, other costs') }}</div></div>›</a>
-<a class="card row" href="{{ url_for('finance') }}"><span style="font-size:1.6rem">📊</span><div class="grow"><strong>{{ _('Finance report') }}</strong><div class="muted">{{ _('Income, expenses and profit by month') }}</div></div>›</a>
-<a class="card row" href="{{ url_for('backup') }}"><span style="font-size:1.6rem">💾</span><div class="grow"><strong>{{ _('Download backup') }}</strong><div class="muted">{{ _('Save all your data as a file') }}</div></div>›</a>
-{% if login_enabled %}<a class="card row" href="{{ url_for('logout') }}"><span style="font-size:1.6rem">🔒</span><div class="grow"><strong>{{ _('Log out') }}</strong></div>›</a>{% endif %}
+{% for endpoint, label in [
+  ('accounts.users', 'Team accounts'), ('items', 'Inventory & prices'), ('customers', 'Customers'),
+  ('stock.damages', 'Damaged & lost items'), ('staff.attendance', 'Attendance'),
+  ('staff.staff_list', 'Staff & salaries'), ('expenses', 'Expenses'), ('finance', 'Finance report'),
+  ('backup', 'Download backup'), ('accounts.password', 'Change password')] %}
+{% if can(endpoint) %}<a class="card row between" href="{{ url_for(endpoint) }}"><strong>{{ _(label) }}</strong><span>›</span></a>{% endif %}
+{% endfor %}
+<form method="post" action="{{ url_for('accounts.logout') }}">
+  {{ csrf_input() }}<button class="btn light block">{{ _('Log out') }}</button>
+</form>
 {% endblock %}

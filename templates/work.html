@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}{{ _('My work') }}{% endblock %}
+{% block fab %}{% endblock %}
+{% block content %}
+{% for a in assignments %}
+<div class="card work-card">
+  <strong>{{ _('Booking #{n}', n=a.booking_id) }} · {{ _(a.event_type) }}</strong>
+  <p>{{ a.customer }} · <a href="tel:{{ a.phone }}">{{ a.phone }}</a><br>{{ a.address or '' }}</p>
+  <div class="muted">{{ a.start_date|dmy('%d %b %Y') }} — {{ a.end_date|dmy('%d %b %Y') }} · {{ _(a.booking_status) }}</div>
+  <p>{{ a.task }}</p>
+  <form method="post" action="{{ url_for('accounts.work_update', assignment_id=a.id) }}">
+    {{ csrf_input() }}
+    <label for="status-{{ a.id }}">{{ _('Work status') }}</label>
+    <select id="status-{{ a.id }}" name="status">{% for status in statuses %}<option value="{{ status }}" {{ 'selected' if a.status == status }}>{{ _(status) }}</option>{% endfor %}</select>
+    <button class="btn light block mt">{{ _('Update status') }}</button>
+  </form>
+</div>
+{% else %}<div class="card muted">{{ _('No work assigned yet.') }}</div>{% endfor %}
+{% endblock %}

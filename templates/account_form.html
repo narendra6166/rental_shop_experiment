@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}{{ _('Edit account') if editing else _('Add account') }}{% endblock %}
+{% block fab %}{% endblock %}
+{% block content %}
+<form method="post" class="card">
+  {{ csrf_input() }}
+  <label for="name">{{ _('Name') }}</label><input id="name" name="name" required value="{{ person.get('name', '') }}">
+  <label for="username">{{ _('Username') }}</label><input id="username" name="username" required minlength="3" maxlength="64" pattern="[A-Za-z0-9_.-]{3,64}" autocomplete="off" value="{{ person.get('username', '') }}">
+  <label for="role">{{ _('Role') }}</label>
+  <select id="role" name="role">{% for role in roles %}<option value="{{ role }}" {{ 'selected' if person.get('role', 'Worker') == role }}>{{ _(role) }}</option>{% endfor %}</select>
+  <label for="password">{{ _('New password (leave blank to keep current)') if editing else _('Password') }}</label>
+  <input id="password" name="password" type="password" minlength="12" autocomplete="new-password" {{ 'required' if not editing }}>
+  <p class="muted">{{ _('Use at least 12 characters for the password.') }}</p>
+  <label for="active">{{ _('Status') }}</label>
+  <select id="active" name="active"><option value="1" {{ 'selected' if person.get('active', 1)|string == '1' }}>{{ _('Active') }}</option><option value="0" {{ 'selected' if person.get('active')|string == '0' }}>{{ _('Inactive') }}</option></select>
+  <button class="btn block mt">{{ _('Save') }}</button>
+</form>
+{% endblock %}

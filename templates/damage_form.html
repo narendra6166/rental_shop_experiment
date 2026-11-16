@@ -3,6 +3,7 @@
 {% block fab %}{% endblock %}
 {% block content %}
 <form method="post" class="card">
+  {{ csrf_input() }}
   <label style="margin-top:0">{{ _('Item') }}</label>
   <select name="item_id" required>
     <option value="">{{ _('Select item') }}</option>

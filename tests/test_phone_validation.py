@@ -3,6 +3,16 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
+from flask.testing import FlaskClient
+from werkzeug.security import generate_password_hash
+
+
+class AuthenticatedClient(FlaskClient):
+    def open(self, *args, **kwargs):
+        if kwargs.get("method", "").upper() == "POST":
+            kwargs["data"] = {**kwargs.get("data", {}), "csrf_token": "regression-token"}
+        return super().open(*args, **kwargs)
+
 
 class PhoneValidationTests(unittest.TestCase):
     @classmethod
@@ -16,19 +26,32 @@ class PhoneValidationTests(unittest.TestCase):
         cls.app = app.app
         cls.db = db
         cls.app.config.update(TESTING=True)
+        cls.path_patch = patch.object(db, "DB_PATH", os.path.join(cls.tempdir.name, "test.db"))
+        cls.path_patch.start()
+        db.init_db()
+        cls.password_hash = generate_password_hash("test-password-long")
 
     @classmethod
     def tearDownClass(cls):
+        cls.path_patch.stop()
         cls.tempdir.cleanup()
 
     def setUp(self):
-        self.client = self.app.test_client()
+        self.client = AuthenticatedClient(self.app, use_cookies=True)
         with self.app.app_context():
             db = self.db.get_db()
+            db.execute("DELETE FROM work_assignments")
             db.execute("DELETE FROM bookings")
             db.execute("DELETE FROM customers")
             db.execute("DELETE FROM staff")
+            db.execute("DELETE FROM users")
+            owner_id = db.execute(
+                "INSERT INTO users (username,name,password_hash,role) VALUES ('owner','Owner',?,'Owner')",
+                (self.password_hash,),
+            ).lastrowid
             db.commit()
+        with self.client.session_transaction() as session:
+            session.update(user_id=owner_id, session_version=1, _csrf="regression-token")
 
     def booking_data(self):
         return {

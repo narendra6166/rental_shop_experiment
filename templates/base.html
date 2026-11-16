@@ -26,13 +26,21 @@
   {% endfor %}
   {% block content %}{% endblock %}
 </main>
-{% block fab %}<a class="fab noprint" href="{{ url_for('booking_new') }}">＋ {{ _('Booking') }}</a>{% endblock %}
+{% block fab %}{% if can('booking_new') %}<a class="fab noprint" href="{{ url_for('booking_new') }}">＋ {{ _('Booking') }}</a>{% endif %}{% endblock %}
 {% block nav %}<nav class="tabbar noprint">
+  {% if current_user %}
   <a href="{{ url_for('dashboard') }}" class="{{ 'on' if ep == 'dashboard' }}"><span>🏠</span>{{ _('Home') }}</a>
+  {% if can('bookings') %}
   <a href="{{ url_for('bookings') }}" class="{{ 'on' if ep.startswith('booking') or ep == 'invoice' }}"><span>📋</span>{{ _('Bookings') }}</a>
+  {% endif %}{% if can('stock.stock') %}
   <a href="{{ url_for('stock.stock') }}" class="{{ 'on' if ep.startswith('stock.') }}"><span>📦</span>{{ _('Stock') }}</a>
+  {% endif %}{% if can('staff.staff_list') %}
   <a href="{{ url_for('staff.staff_list') }}" class="{{ 'on' if ep.startswith('staff.') or ep == 'staff.attendance' }}"><span>👥</span>{{ _('Staff') }}</a>
+  {% endif %}{% if current_user.role in ('Staff', 'Worker') %}
+  <a href="{{ url_for('accounts.work') }}"><span>📋</span>{{ _('My work') }}</a>
+  {% endif %}
   <a href="{{ url_for('more') }}" class="{{ 'on' if ep in ('more', 'items', 'item_form', 'customers', 'customer_new') }}"><span>☰</span>{{ _('More') }}</a>
+  {% endif %}
 </nav>{% endblock %}
 </body>
 </html>

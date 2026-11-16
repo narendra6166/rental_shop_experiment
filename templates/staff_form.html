@@ -3,6 +3,7 @@
 {% block fab %}{% endblock %}
 {% block content %}
 <form method="post" class="card">
+  {{ csrf_input() }}
   <label style="margin-top:0">{{ _('Name') }}</label><input name="name" required value="{{ p.get('name', '') }}">
   <label for="phone">{{ _('Phone') }}</label><input id="phone" name="phone" type="tel" inputmode="numeric" autocomplete="tel-national" maxlength="10" pattern="[0-9]{10}" title="{{ _('Phone number must contain exactly 10 digits.') }}" value="{{ p.get('phone', '') or '' }}">
   <label>{{ _('Role') }}</label><input name="role" required list="roles" placeholder="{{ _('Driver, Helper, Cook...') }}" value="{{ p.get('role', '') }}">

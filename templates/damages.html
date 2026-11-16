@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% from "_macros.html" import empty %}
 {% block title %}{{ _('Damaged & lost') }}{% endblock %}
-{% block fab %}<a class="fab noprint" href="{{ url_for('stock.damage_new') }}">＋ {{ _('Report') }}</a>{% endblock %}
+{% block fab %}{% if can('stock.damage_new') %}<a class="fab noprint" href="{{ url_for('stock.damage_new') }}">＋ {{ _('Report') }}</a>{% endif %}{% endblock %}
 {% block content %}
 <div class="chips">
   <a class="chip {{ 'on' if show == 'open' }}" href="{{ url_for('stock.damages', show='open') }}">{{ _('Open') }}</a>
@@ -13,10 +13,10 @@
     <span class="pill {{ {'Open': 'red', 'Repaired': 'green', 'Written off': 'grey'}[d.status] }}">{{ _(d.status) }}</span></div>
   <div class="muted mt">{{ _(d.kind) }} · {{ d.reported_on|dmy }}{% if d.bid %} · <a style="color:var(--primary)" href="{{ url_for('booking_view', booking_id=d.bid) }}">#{{ d.bid }} {{ d.customer }}</a>{% endif %}{% if d.charge %} · {{ _('charged {amt}', amt=d.charge|money) }}{% endif %}</div>
   {% if d.note %}<div class="muted">📝 {{ d.note }}</div>{% endif %}
-  {% if d.status == 'Open' %}
+  {% if d.status == 'Open' and can('stock.damage_resolve', 'POST') %}
   <div class="row mt">
-    <form class="inline" method="post" action="{{ url_for('stock.damage_resolve', damage_id=d.id) }}"><input type="hidden" name="action" value="repaired"><button class="btn green sm">🔧 {{ _('Repaired') }}</button></form>
-    <form class="inline" method="post" action="{{ url_for('stock.damage_resolve', damage_id=d.id) }}" onsubmit="return confirm({{ _('Write off? Total stock will reduce.')|tojson|forceescape }})"><input type="hidden" name="action" value="writeoff"><button class="btn danger sm">{{ _('Write off') }}</button></form>
+    <form class="inline" method="post" action="{{ url_for('stock.damage_resolve', damage_id=d.id) }}">{{ csrf_input() }}<input type="hidden" name="action" value="repaired"><button class="btn green sm">🔧 {{ _('Repaired') }}</button></form>
+    <form class="inline" method="post" action="{{ url_for('stock.damage_resolve', damage_id=d.id) }}" onsubmit="return confirm({{ _('Write off? Total stock will reduce.')|tojson|forceescape }})">{{ csrf_input() }}<input type="hidden" name="action" value="writeoff"><button class="btn danger sm">{{ _('Write off') }}</button></form>
   </div>
   {% endif %}
 </div>

@@ -3,10 +3,10 @@
 {% block back %}{% endblock %}
 {% block title %}{{ _('Staff') }}{% endblock %}
 {% block subtitle %}<small>{{ _('{n} members', n=people|length) }}</small>{% endblock %}
-{% block hero_action %}<a class="circle" href="{{ url_for('staff.attendance') }}" title="{{ _('Attendance') }}">✅</a>{% endblock %}
-{% block fab %}<a class="fab noprint" href="{{ url_for('staff.staff_form') }}">＋ {{ _('Staff') }}</a>{% endblock %}
+{% block hero_action %}{% if can('staff.attendance') %}<a class="circle" href="{{ url_for('staff.attendance') }}" title="{{ _('Attendance') }}">✅</a>{% endif %}{% endblock %}
+{% block fab %}{% if can('staff.staff_form') %}<a class="fab noprint" href="{{ url_for('staff.staff_form') }}">＋ {{ _('Staff') }}</a>{% endif %}{% endblock %}
 {% block content %}
-<a class="btn light block" href="{{ url_for('staff.attendance') }}" style="margin-bottom:12px">✅ {{ _("Mark today's attendance") }}</a>
+{% if can('staff.attendance') %}<a class="btn light block" href="{{ url_for('staff.attendance') }}" style="margin-bottom:12px">✅ {{ _('Attendance') }}</a>{% endif %}
 {% for p in people %}
 <a class="card" href="{{ url_for('staff.staff_view', staff_id=p.s.id) }}" style="{{ 'opacity:.55' if not p.s.active }}">
   <div class="row">

@@ -3,6 +3,7 @@
 {% block fab %}{% endblock %}
 {% block content %}
 <form method="post" class="card">
+  {{ csrf_input() }}
   <label style="margin-top:0">{{ _('Name') }}</label><input name="name" required value="{{ item.name if item else '' }}">
   <label for="category">{{ _('Category') }}</label>
   <select id="category" name="category" required>

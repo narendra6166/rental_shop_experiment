@@ -1,13 +1,14 @@
-import hmac
 import os
+import secrets
 import sqlite3
 import tempfile
 from datetime import date, datetime, timedelta
 
 from flask import (Flask, flash, make_response, redirect, render_template, request, send_file,
-                   session, url_for)
+                   url_for)
 
 import db as core
+from accounts import allowed, bootstrap_owner, install_accounts
 from i18n import LANGS, _, fmt_date, get_lang
 from db import (EVENT_TYPES, EXPENSE_CATEGORIES, PAYMENT_KINDS, STATUS_TABS, STATUSES,
                 STOCK_PURCHASE, available_qty, booking_totals, get_db, month_finance, parse_date,
@@ -23,8 +24,10 @@ SHOP_ADDRESS = os.environ.get(
 SHOP_PHONE = os.environ.get("SHOP_PHONE", "")
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", "change-me-in-production")
+app.secret_key = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
+app.config["SESSION_COOKIE_SECURE"] = os.environ.get("COOKIE_SECURE") == "1"
 app.teardown_appcontext(core.close_db)
+install_accounts(app)
 app.register_blueprint(staff_bp)
 app.register_blueprint(stock_bp)
 app.jinja_env.globals.update(salary_types=core.SALARY_TYPES, id_types=core.ID_TYPES,
@@ -418,6 +421,9 @@ def booking_new(booking_id=None):
         travel = money_field(form, "travel_charge", errors, "Travel charges")
         labour = money_field(form, "labour_charge", errors, "Labour charges")
         damage = money_field(form, "damage_charge", errors, "Damage charges")
+        advance = money_field(form, "advance", errors, "Advance") if not existing else 0
+        if advance and not allowed("booking_payment", "POST"):
+            errors.append(_("Only Owner or Accounts can record payments."))
         chosen = []
         for i in all_items:
             raw = form.get(f"qty_{i['id']}", "").strip()
@@ -473,10 +479,6 @@ def booking_new(booking_id=None):
                   old[i["id"]]["deposit"] if i["id"] in old else i["deposit"]) for i, q in chosen],
             )
             if not existing:
-                try:
-                    advance = float(form.get("advance") or 0)
-                except ValueError:
-                    advance = 0
                 if advance > 0:
                     db.execute(
                         "INSERT INTO payments (booking_id, amount, kind, paid_on) VALUES (?,?,?,?)",
@@ -504,8 +506,15 @@ def booking_view(booking_id):
     if not b:
         return redirect(url_for("bookings"))
     t = booking_totals(get_db(), booking_id)
+    db = get_db()
+    assignments = db.execute(
+        """SELECT a.*,u.name FROM work_assignments a JOIN users u ON u.id=a.user_id
+           WHERE a.booking_id=? ORDER BY u.name""", (booking_id,)).fetchall()
+    workers = db.execute(
+        "SELECT id,name,role FROM users WHERE active=1 AND role IN ('Staff','Worker') ORDER BY name"
+    ).fetchall()
     return render_template("booking_view.html", b=dict(b, balance=t["balance"]), t=t,
-                           kinds=PAYMENT_KINDS)
+                           kinds=PAYMENT_KINDS, assignments=assignments, workers=workers)
 
 
 @app.route("/bookings/<int:booking_id>/invoice")
@@ -577,35 +586,10 @@ def booking_delete(booking_id):
     return redirect(url_for("bookings"))
 
 
-# ---------- Optional login (set APP_PASSWORD to turn it on) ----------
-APP_PASSWORD = os.environ.get("APP_PASSWORD", "")
-APP_USER = os.environ.get("APP_USER", "admin")
-app.jinja_env.globals["login_enabled"] = bool(APP_PASSWORD)
-
-
-@app.before_request
-def require_login():
-    if APP_PASSWORD and not session.get("auth") and request.endpoint not in ("login", "static", "set_language"):
-        return redirect(url_for("login", next=request.full_path.rstrip("?")))
-
-
-@app.route("/login", methods=["GET", "POST"])
-def login():
-    if request.method == "POST":
-        if APP_PASSWORD and hmac.compare_digest(request.form.get("user", "").strip(), APP_USER) \
-                and hmac.compare_digest(request.form.get("password", ""), APP_PASSWORD):
-            session["auth"] = True
-            session.permanent = True
-            nxt = request.args.get("next", "")
-            return redirect(nxt if nxt.startswith("/") and not nxt.startswith("//") else url_for("dashboard"))
-        flash(_("Wrong ID or password."), "error")
-    return render_template("login.html")
-
-
-@app.route("/logout")
-def logout():
-    session.clear()
-    return redirect(url_for("login"))
+@app.errorhandler(403)
+@app.errorhandler(400)
+def request_error(error):
+    return render_template("request_error.html", message=error.description), error.code
 
 
 # ---------- Automatic daily backup (kept in the backups/ folder, last 14 days) ----------
@@ -634,6 +618,7 @@ def auto_backup():
 
 
 core.init_db()
+bootstrap_owner(app, os.environ.get("APP_USER", "admin"), os.environ.get("APP_PASSWORD", ""))
 
 if __name__ == "__main__":
     app.run(host=os.environ.get("HOST", "127.0.0.1"), debug=os.environ.get("FLASK_DEBUG") == "1")

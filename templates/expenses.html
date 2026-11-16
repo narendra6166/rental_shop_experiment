@@ -2,7 +2,7 @@
 {% from "_macros.html" import empty %}
 {% block title %}{{ _('Expenses') }}{% endblock %}
 {% block subtitle %}<small>{{ _('Shop rent, stock purchases, other costs') }}</small>{% endblock %}
-{% block fab %}<a class="fab noprint" href="{{ url_for('expense_new') }}">＋ {{ _('Expense') }}</a>{% endblock %}
+{% block fab %}{% if can('expense_new') %}<a class="fab noprint" href="{{ url_for('expense_new') }}">＋ {{ _('Expense') }}</a>{% endif %}{% endblock %}
 {% block content %}
 <div class="row between" style="margin-bottom:12px">
   <a class="btn light sm" href="{{ url_for('expenses', month=prev_month) }}">‹</a>
@@ -16,7 +16,7 @@
     <div class="grow"><strong>{{ _(e.category) }}</strong>
       <div class="muted">{{ e.paid_on|dmy }}{% if e.item %} · {{ e.item }} × {{ e.qty }}{% endif %}{% if e.note %} · {{ e.note }}{% endif %}</div></div>
     <b>{{ e.amount|money }}</b>
-    <form class="inline" method="post" action="{{ url_for('expense_delete', expense_id=e.id) }}" onsubmit="return confirm({{ _('Delete this expense?')|tojson|forceescape }})"><button class="btn danger sm">✕</button></form>
+    {% if can('expense_delete', 'POST') %}<form class="inline" method="post" action="{{ url_for('expense_delete', expense_id=e.id) }}" onsubmit="return confirm({{ _('Delete this expense?')|tojson|forceescape }})">{{ csrf_input() }}<button class="btn danger sm">✕</button></form>{% endif %}
   </div>
 </div>
 {% else %}{{ empty('🧾', _('No expenses this month')) }}{% endfor %}
