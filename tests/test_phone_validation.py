@@ -86,6 +86,43 @@ class PhoneValidationTests(unittest.TestCase):
             self.assertEqual(db.execute("SELECT COUNT(*) FROM customers").fetchone()[0], 0)
             self.assertEqual(db.execute("SELECT COUNT(*) FROM bookings").fetchone()[0], 0)
 
+    def test_rental_bill_shows_consistent_totals_and_payment_history(self):
+        response = self.client.post("/bookings/new", data=self.booking_data())
+        booking_id = int(response.headers["Location"].rsplit("/", 1)[-1])
+        with self.app.app_context():
+            db = self.db.get_db()
+            db.execute("UPDATE booking_items SET rate=100, deposit=50 WHERE booking_id=?", (booking_id,))
+            db.execute("UPDATE bookings SET discount=150 WHERE id=?", (booking_id,))
+            db.execute("INSERT INTO payments (booking_id, amount, kind, paid_on) VALUES (?, 30, 'Advance', '2027-01-01')", (booking_id,))
+            db.commit()
+        url = f"/bookings/{booking_id}/invoice"
+        bill = self.client.get(url).get_data(as_text=True)
+        self.assertIn("Not a GST tax invoice", bill)
+        self.assertIn("<td>Discount applied</td><td class=\"num\">-₹100</td>", bill)
+        self.assertIn("<td>Refundable deposit</td><td class=\"num\">₹50</td>", bill)
+        self.assertIn("<td>Total due before payments</td><td class=\"num\">₹50</td>", bill)
+        self.assertIn("<td>Balance due</td><td class=\"num\">₹20</td>", bill)
+        self.assertIn("<td>2027-01-01</td><td>Advance</td><td class=\"num\">₹30</td>", bill)
+        with self.app.app_context():
+            db = self.db.get_db()
+            db.execute("UPDATE bookings SET status='Returned' WHERE id=?", (booking_id,))
+            db.execute("INSERT INTO payments (booking_id, amount, kind, paid_on) VALUES (?, 10, 'Deposit refund', '2027-01-02')", (booking_id,))
+            db.commit()
+        bill = self.client.get(url).get_data(as_text=True)
+        self.assertIn("refundable deposit of ₹50 is excluded", bill)
+        self.assertIn("<td>Total due before payments</td><td class=\"num\">₹0</td>", bill)
+        self.assertIn("<td>Refund due</td><td class=\"num\">₹20</td>", bill)
+        self.assertIn("<td>Refunded</td><td class=\"num\">+₹10</td>", bill)
+        with self.app.app_context():
+            db = self.db.get_db()
+            db.execute("UPDATE bookings SET status='Cancelled', cancel_fee=15 WHERE id=?", (booking_id,))
+            db.commit()
+        bill = self.client.get(url).get_data(as_text=True)
+        self.assertIn("Items booked (not charged after cancellation)", bill)
+        self.assertIn("<td>Total due before payments</td><td class=\"num\">₹15</td>", bill)
+        self.assertIn("<td>Refund due</td><td class=\"num\">₹5</td>", bill)
+        self.assertNotIn("<td>Refundable deposit</td>", bill)
+
     def test_inline_customer_reuse_and_edit_preserve_other_bookings(self):
         first = self.client.post("/bookings/new", data=self.booking_data())
         second = self.client.post("/bookings/new", data=self.booking_data())

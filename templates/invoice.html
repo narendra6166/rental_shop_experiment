@@ -1,35 +1,75 @@
 {% extends "base.html" %}
-{% block title %}{{ _('Invoice #{n}', n=b.id) }}{% endblock %}
+{% block title %}{{ _('Rental bill #{n}', n=b.id) }}{% endblock %}
 {% block fab %}{% endblock %}
 {% block content %}
-<div class="card">
-  <div style="text-align:center">
-    <h2 style="margin-bottom:2px">{{ _(shop_name) }}</h2>
-    <div class="muted">{{ shop_address }}{% if shop_phone %}<br>📞 {{ shop_phone }}{% endif %}</div>
+<div class="card invoice">
+  <div class="invoice-header">
+    <div>
+      <h2>{{ _(shop_name) }}</h2>
+      <div class="muted">{{ shop_address }}{% if shop_phone %}<br>{{ _('Phone') }}: {{ shop_phone }}{% endif %}</div>
+    </div>
+    <div class="invoice-reference">
+      <strong>{{ _('Rental bill #{n}', n=b.id) }}</strong>
+      <div class="muted">{{ _('Not a GST tax invoice') }}</div>
+      <div class="muted">{{ _('Generated on') }}: {{ today()|ldate('%d %b %Y') }}</div>
+      <div class="muted">{{ _('Booked on') }}: {{ b.created_at[:10] }}</div>
+    </div>
   </div>
-  <hr>
-  <div class="muted">{{ _('Invoice #{n}', n=b.id) }} · {{ today()|ldate('%d %b %Y') }}</div>
-  <p><strong>{{ b.customer }}</strong>, {{ b.phone }}<br>{{ b.address }}<br>
-  {{ _(b.event_type) }}: {{ _('{a} to {b}', a=b.start_date|dmy, b=b.end_date|dmy) }} ({{ _('{n} days' if t.days > 1 else '{n} day', n=t.days) }})</p>
-  <table class="lines">
-    <tr><th>{{ _('Item') }}</th><th class="num">{{ _('Qty') }}</th><th class="num">{{ _('Rate') }}</th><th class="num">{{ _('Amount') }}</th></tr>
-    {% for l in t.lines %}
-    <tr><td>{{ l.name }}</td><td class="num">{{ l.qty }}</td><td class="num">{{ l.rate|money }}</td><td class="num">{{ (l.qty * l.rate * t.days)|money }}</td></tr>
-    {% endfor %}
-    {% if t.cancelled %}<tr><td colspan="3">{{ _('Cancellation fee') }}</td><td class="num">{{ t.cancel_fee|money }}</td></tr>{% else %}
-    <tr><td colspan="3">{{ _('Rent') }}</td><td class="num">{{ t.rent|money }}</td></tr>
-    {% if t.discount %}<tr><td colspan="3">{{ _('Discount') }}</td><td class="num">-{{ t.discount|money }}</td></tr>{% endif %}
-    <tr><td colspan="3">{{ _('Refundable deposit') }}{% if t.deposit_returned %} ({{ _('returned separately') }}){% endif %}</td><td class="num">{{ t.deposit|money }}</td></tr>
-    {% if t.travel %}<tr><td colspan="3">{{ _('Travel charges') }}</td><td class="num">{{ t.travel|money }}</td></tr>{% endif %}
-    {% if t.labour %}<tr><td colspan="3">{{ _('Labour charges') }}</td><td class="num">{{ t.labour|money }}</td></tr>{% endif %}
-    {% if t.damage %}<tr><td colspan="3">{{ _('Damage charges') }}</td><td class="num">{{ t.damage|money }}</td></tr>{% endif %}
+
+  <div class="invoice-details">
+    <div>
+      <h3>{{ _('Bill to') }}</h3>
+      <strong>{{ b.customer }}</strong><br>
+      {{ _('Phone') }}: {{ b.phone }}{% if b.address %}<br>{{ b.address }}{% endif %}
+    </div>
+    <div>
+      <h3>{{ _('Event details') }}</h3>
+      {{ _(b.event_type) }}<br>
+      {{ b.start_date }} {{ _('to') }} {{ b.end_date }}<br>
+      {{ _('{n} days' if t.days > 1 else '{n} day', n=t.days) }}
+    </div>
+  </div>
+
+  <h3>{{ _('Items booked (not charged after cancellation)') if t.cancelled else _('Rental items') }}</h3>
+  <div class="invoice-table">
+    <table class="lines">
+      <thead><tr><th>{{ _('Item') }}</th><th class="num">{{ _('Qty') }}</th><th class="num">{{ _('Rate / day') }}</th><th class="num">{{ _('Days') }}</th><th class="num">{{ _('Amount') }}</th></tr></thead>
+      <tbody>{% for l in t.lines %}
+      <tr><td>{{ l.name }}</td><td class="num">{{ l.qty }}</td><td class="num">{{ l.rate|money }}</td><td class="num">{{ t.days }}</td><td class="num">{{ (l.qty * l.rate * t.days)|money }}</td></tr>
+      {% endfor %}</tbody>
+    </table>
+  </div>
+
+  <h3 class="invoice-section">{{ _('Bill summary') }}</h3>
+  <table class="lines invoice-summary">
+    {% if t.cancelled %}
+    <tr><td>{{ _('Cancellation fee') }}</td><td class="num">{{ t.cancel_fee|money }}</td></tr>
+    {% else %}
+    <tr><td>{{ _('Rent') }}</td><td class="num">{{ t.rent|money }}</td></tr>
+    {% if t.discount %}<tr><td>{{ _('Discount applied') }}</td><td class="num">-{{ ([t.discount, t.rent]|min)|money }}</td></tr>{% endif %}
+    {% if t.travel %}<tr><td>{{ _('Travel charges') }}</td><td class="num">{{ t.travel|money }}</td></tr>{% endif %}
+    {% if t.labour %}<tr><td>{{ _('Labour charges') }}</td><td class="num">{{ t.labour|money }}</td></tr>{% endif %}
+    {% if t.damage %}<tr><td>{{ _('Damage charges') }}</td><td class="num">{{ t.damage|money }}</td></tr>{% endif %}
+    {% if not t.deposit_returned %}<tr><td>{{ _('Refundable deposit') }}</td><td class="num">{{ t.deposit|money }}</td></tr>{% endif %}
     {% endif %}
-    <tr class="total"><td colspan="3">{{ _('Total') }}</td><td class="num">{{ t.total|money }}</td></tr>
-    <tr><td colspan="3">{{ _('Paid') }}</td><td class="num">{{ t.paid|money }}</td></tr>
-    {% if t.refunded %}<tr><td colspan="3">{{ _('Refunded') }}</td><td class="num">-{{ t.refunded|money }}</td></tr>{% endif %}
-    <tr class="total"><td colspan="3">{{ _('Deposit to refund') if t.balance < 0 else _('Balance due') }}</td><td class="num">{{ t.balance|abs|money }}</td></tr>
+    <tr class="total"><td>{{ _('Total due before payments') }}</td><td class="num">{{ t.total|money }}</td></tr>
+    <tr><td>{{ _('Paid') }}</td><td class="num">-{{ t.paid|money }}</td></tr>
+    {% if t.refunded %}<tr><td>{{ _('Refunded') }}</td><td class="num">+{{ t.refunded|money }}</td></tr>{% endif %}
+    <tr class="total"><td>{{ _('Refund due') if t.balance < 0 else _('Balance due') }}</td><td class="num">{{ t.balance|abs|money }}</td></tr>
+  </table>
+  {% if t.deposit_returned and t.deposit and not t.cancelled %}
+  <p class="muted">{{ _('Items returned: the refundable deposit of {amount} is excluded from the total above.', amount=t.deposit|money) }}</p>
+  {% endif %}
+
+  <h3 class="invoice-section">{{ _('Payment history') }}</h3>
+  <table class="lines">
+    <thead><tr><th>{{ _('Date') }}</th><th>{{ _('Type') }}</th><th class="num">{{ _('Amount') }}</th></tr></thead>
+    <tbody>{% for p in t.payments %}
+    <tr><td>{{ p.paid_on }}</td><td>{{ _(p.kind) }}</td><td class="num">{{ p.amount|money }}</td></tr>
+    {% else %}<tr><td colspan="3">{{ _('No payments yet') }}</td></tr>{% endfor %}</tbody>
   </table>
   <p class="muted">{{ _('Deposit is refundable on return of items in good condition. Damaged or lost items will be charged.') }}</p>
+  <p class="muted">{{ _('This bill reflects the current booking and recorded payments.') }}</p>
   <button class="btn block noprint" onclick="window.print()">🖨️ {{ _('Print / Save PDF') }}</button>
 </div>
 {% endblock %}

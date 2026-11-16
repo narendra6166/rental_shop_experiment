@@ -127,6 +127,15 @@ table.lines { width: 100%; border-collapse: collapse; font-size: .92rem; }
 table.lines td, table.lines th { padding: 8px 4px; border-bottom: 1px solid var(--line); text-align: left; }
 table.lines td.num, table.lines th.num { text-align: right; }
 table.lines tr.total td { font-weight: 800; border-top: 2px solid var(--ink); }
+.invoice { overflow-wrap: anywhere; }
+.invoice-header, .invoice-details { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 20px;
+  padding-bottom: 16px; margin-bottom: 16px; border-bottom: 1px solid var(--line); }
+.invoice-header > div, .invoice-details > div { flex: 1 1 180px; min-width: 0; }
+.invoice h3 { font-size: .95rem; margin-bottom: 8px; }
+.invoice-section { margin-top: 20px; }
+.invoice-table { overflow-x: auto; }
+.invoice-table table { min-width: 460px; }
+.invoice-summary { max-width: 400px; margin-left: auto; }
 
 /* Attendance buttons */
 .seg { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-top: 10px; }
@@ -169,4 +178,7 @@ table.lines tr.total td { font-weight: 800; border-top: 2px solid var(--ink); }
 @media print {
   .hero, .tabbar, .fab, .noprint { display: none !important; }
   body { background: #fff; padding: 0; } .card { box-shadow: none; }
+  .invoice-table { overflow: visible; }
+  .invoice-table table { min-width: 0; }
+  .invoice { padding: 0; font-size: .9rem; }
 }
