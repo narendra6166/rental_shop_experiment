@@ -2,7 +2,7 @@ from datetime import date
 
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 
-from db import OUT_STATUSES, booked_qty, damaged_open, get_db, parse_date
+from db import ITEM_CATEGORIES, OUT_STATUSES, booked_qty, damaged_open, get_db, parse_date
 from i18n import _
 
 stock_bp = Blueprint("stock", __name__)
@@ -39,7 +39,10 @@ def stock():
         "taken": sum(r["taken"] for r in rows),
         "damaged": sum(r["damaged"] for r in rows),
     }
-    return render_template("stock.html", rows=rows, start=start_s, end=end_s,
+    category_rows = {category: [] for category in ITEM_CATEGORIES}
+    for row in rows:
+        category_rows.setdefault(row["i"]["category"], []).append(row)
+    return render_template("stock.html", category_rows=category_rows, start=start_s, end=end_s,
                            pending=pending, summary=summary, today=today)
 
 

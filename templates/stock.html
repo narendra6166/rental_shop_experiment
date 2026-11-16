@@ -17,8 +17,11 @@
   <div class="stat"><b>{{ summary.taken }}</b><span>{{ _('Booked / on rent') }}</span></div>
   <div class="stat"><b>{{ summary.damaged }}</b><span>{{ _('Damaged') }}</span></div>
 </div>
+{% for category, rows in category_rows.items() %}
+<details class="stock-category" name="stock-category">
+  <summary><h2>{{ _(category) }}</h2></summary>
+  <div class="stock-category-items">
 {% for r in rows %}
-{% if loop.changed(r.i.category) %}<div class="section"><h2>{{ _(r.i.category) }}</h2></div>{% endif %}
 {% set total = r.i.total_qty %}
 {% set cls = 'zero' if r.free <= 0 else ('low' if r.free * 4 <= total else 'ok') %}
 <div class="card">
@@ -33,6 +36,9 @@
     {% if r.damaged %}<span class="pill red">{{ _('Damaged {n}', n=r.damaged) }}</span>{% endif %}
   </div>
 </div>
+{% else %}<div class="card muted">{{ _('No items in this category yet.') }}</div>{% endfor %}
+  </div>
+</details>
 {% endfor %}
 <a class="btn light block" href="{{ url_for('stock.damages') }}">🛠️ {{ _('Damaged & lost items') }}</a>
 <div class="section"><h2>{{ _('Pending returns') }}</h2></div>
