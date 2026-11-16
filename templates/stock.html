@@ -1,13 +1,12 @@
 {% extends "base.html" %}
 {% block title %}{{ _('Stock availability') }}{% endblock %}
-{% block subtitle %}<small>{{ _('See what is free on any dates') }}</small>{% endblock %}
+{% block subtitle %}<small>{{ _('Pick dates to see stock for that day') }}</small>{% endblock %}
 {% block back %}{% endblock %}
 {% block content %}
 <div class="stats">
-  <div class="stat"><b>{{ summary.total }}</b><span>{{ _('Total quantity') }}</span></div>
+  <div class="stat"><b>{{ summary.total }}</b><span>{{ _('Total stock') }}</span></div>
   <div class="stat hl"><b>{{ summary.free }}</b><span>{{ _('Available (selected dates)') }}</span></div>
-  <div class="stat"><b>{{ summary.on_rent }}</b><span>{{ _('On rent (to return)') }}</span></div>
-  <div class="stat"><b>{{ summary.upcoming }}</b><span>{{ _('Booked (upcoming)') }}</span></div>
+  <div class="stat"><b>{{ summary.taken }}</b><span>{{ _('Booked / on rent (selected dates)') }}</span></div>
   <div class="stat"><b>{{ summary.damaged }}</b><span>{{ _('Damaged') }}</span></div>
 </div>
 <div class="section"><h2>{{ _('Pending returns') }}</h2></div>
@@ -36,9 +35,8 @@
   </div>
   <div class="bar"><i class="{{ cls if cls != 'ok' }}" style="width:{{ (100 * r.free / total) if total and r.free > 0 else 0 }}%"></i></div>
   <div class="row wrapflex mt">
-    <span class="pill purple">{{ _('Reserved {n}', n=r.reserved) }}</span>
-    <span class="pill orange">{{ _('Booked {n}', n=r.upcoming) }}</span>
-    <span class="pill blue">{{ _('On rent {n}', n=r.out_now) }}</span>
+    <span class="pill orange">{{ _('Booked {n}', n=r.booked) }}</span>
+    <span class="pill blue">{{ _('On rent {n}', n=r.on_rent) }}</span>
     {% if r.damaged %}<span class="pill red">{{ _('Damaged {n}', n=r.damaged) }}</span>{% endif %}
   </div>
 </div>
