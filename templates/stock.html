@@ -1,30 +1,30 @@
 {% extends "base.html" %}
-{% block title %}Stock availability{% endblock %}
-{% block subtitle %}<small>See what is free on any dates</small>{% endblock %}
+{% block title %}{{ _('Stock availability') }}{% endblock %}
+{% block subtitle %}<small>{{ _('See what is free on any dates') }}</small>{% endblock %}
 {% block back %}{% endblock %}
 {% block content %}
 <form method="get" class="card">
   <div class="grid2">
-    <div><label style="margin-top:0">From</label><input type="date" name="start_date" value="{{ start }}"></div>
-    <div><label style="margin-top:0">To</label><input type="date" name="end_date" value="{{ end }}"></div>
+    <div><label style="margin-top:0">{{ _('From') }}</label><input type="date" name="start_date" value="{{ start }}"></div>
+    <div><label style="margin-top:0">{{ _('To') }}</label><input type="date" name="end_date" value="{{ end }}"></div>
   </div>
-  <button class="btn block mt">Check availability</button>
+  <button class="btn block mt">{{ _('Check availability') }}</button>
 </form>
 {% for r in rows %}
 {% set total = r.i.total_qty %}
 {% set cls = 'zero' if r.free <= 0 else ('low' if r.free * 4 <= total else 'ok') %}
 <div class="card">
   <div class="row between">
-    <div class="grow"><strong>{{ r.i.name }}</strong><div class="muted">{{ r.i.category }} · total {{ total }}</div></div>
-    <div class="num"><span class="avail {{ cls }}">{{ r.free }}</span><div class="muted">free</div></div>
+    <div class="grow"><strong>{{ r.i.name }}</strong><div class="muted">{{ r.i.category }} · {{ _('{n} total', n=total) }}</div></div>
+    <div class="num"><span class="avail {{ cls }}">{{ r.free }}</span><div class="muted">{{ _('free') }}</div></div>
   </div>
   <div class="bar"><i class="{{ cls if cls != 'ok' }}" style="width:{{ (100 * r.free / total) if total and r.free > 0 else 0 }}%"></i></div>
   <div class="row wrapflex mt">
-    <span class="pill purple">Reserved {{ r.reserved }}</span>
-    <span class="pill blue">Out now {{ r.out_now }}</span>
-    {% if r.damaged %}<span class="pill red">Damaged {{ r.damaged }}</span>{% endif %}
+    <span class="pill purple">{{ _('Reserved {n}', n=r.reserved) }}</span>
+    <span class="pill blue">{{ _('Out now {n}', n=r.out_now) }}</span>
+    {% if r.damaged %}<span class="pill red">{{ _('Damaged {n}', n=r.damaged) }}</span>{% endif %}
   </div>
 </div>
 {% endfor %}
-<a class="btn light block" href="{{ url_for('stock.damages') }}">🛠️ Damaged &amp; lost items</a>
+<a class="btn light block" href="{{ url_for('stock.damages') }}">🛠️ {{ _('Damaged & lost items') }}</a>
 {% endblock %}

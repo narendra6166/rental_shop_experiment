@@ -1,26 +1,26 @@
 {% extends "base.html" %}
-{% block title %}Invoice #{{ b.id }}{% endblock %}
+{% block title %}{{ _('Invoice #{n}', n=b.id) }}{% endblock %}
 {% block fab %}{% endblock %}
 {% block content %}
 <div class="card">
-  <h2>{{ shop_name }}</h2>
-  <div class="muted">Invoice #{{ b.id }} · {{ today().strftime('%d %b %Y') }}</div>
+  <h2>{{ _(shop_name) }}</h2>
+  <div class="muted">{{ _('Invoice #{n}', n=b.id) }} · {{ today()|ldate('%d %b %Y') }}</div>
   <p><strong>{{ b.customer }}</strong>, {{ b.phone }}<br>{{ b.address }}<br>
-  {{ b.event_type }}: {{ b.start_date|dmy }} to {{ b.end_date|dmy }} ({{ t.days }} day{{ 's' if t.days > 1 }})</p>
+  {{ _(b.event_type) }}: {{ _('{a} to {b}', a=b.start_date|dmy, b=b.end_date|dmy) }} ({{ _('{n} days' if t.days > 1 else '{n} day', n=t.days) }})</p>
   <table class="lines">
-    <tr><th>Item</th><th class="num">Qty</th><th class="num">Rate</th><th class="num">Amount</th></tr>
+    <tr><th>{{ _('Item') }}</th><th class="num">{{ _('Qty') }}</th><th class="num">{{ _('Rate') }}</th><th class="num">{{ _('Amount') }}</th></tr>
     {% for l in t.lines %}
     <tr><td>{{ l.name }}</td><td class="num">{{ l.qty }}</td><td class="num">{{ l.rate|money }}</td><td class="num">{{ (l.qty * l.rate * t.days)|money }}</td></tr>
     {% endfor %}
-    <tr><td colspan="3">Rent</td><td class="num">{{ t.rent|money }}</td></tr>
-    {% if t.discount %}<tr><td colspan="3">Discount</td><td class="num">-{{ t.discount|money }}</td></tr>{% endif %}
-    <tr><td colspan="3">Refundable deposit</td><td class="num">{{ t.deposit|money }}</td></tr>
-    {% if t.damage %}<tr><td colspan="3">Damage charges</td><td class="num">{{ t.damage|money }}</td></tr>{% endif %}
-    <tr class="total"><td colspan="3">Total</td><td class="num">{{ t.total|money }}</td></tr>
-    <tr><td colspan="3">Paid</td><td class="num">{{ t.paid|money }}</td></tr>
-    <tr class="total"><td colspan="3">Balance</td><td class="num">{{ t.balance|money }}</td></tr>
+    <tr><td colspan="3">{{ _('Rent') }}</td><td class="num">{{ t.rent|money }}</td></tr>
+    {% if t.discount %}<tr><td colspan="3">{{ _('Discount') }}</td><td class="num">-{{ t.discount|money }}</td></tr>{% endif %}
+    <tr><td colspan="3">{{ _('Refundable deposit') }}</td><td class="num">{{ t.deposit|money }}</td></tr>
+    {% if t.damage %}<tr><td colspan="3">{{ _('Damage charges') }}</td><td class="num">{{ t.damage|money }}</td></tr>{% endif %}
+    <tr class="total"><td colspan="3">{{ _('Total') }}</td><td class="num">{{ t.total|money }}</td></tr>
+    <tr><td colspan="3">{{ _('Paid') }}</td><td class="num">{{ t.paid|money }}</td></tr>
+    <tr class="total"><td colspan="3">{{ _('Balance') }}</td><td class="num">{{ t.balance|money }}</td></tr>
   </table>
-  <p class="muted">Deposit is refundable on return of items in good condition. Damaged or lost items will be charged.</p>
-  <button class="btn block noprint" onclick="window.print()">🖨️ Print / Save PDF</button>
+  <p class="muted">{{ _('Deposit is refundable on return of items in good condition. Damaged or lost items will be charged.') }}</p>
+  <button class="btn block noprint" onclick="window.print()">🖨️ {{ _('Print / Save PDF') }}</button>
 </div>
 {% endblock %}

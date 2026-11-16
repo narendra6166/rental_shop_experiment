@@ -1,11 +1,11 @@
 {% extends "base.html" %}
-{% block title %}Add customer{% endblock %}
+{% block title %}{{ _('Add customer') }}{% endblock %}
 {% block fab %}{% endblock %}
 {% block content %}
 <form method="post" class="card">
-  <label style="margin-top:0">Name</label><input name="name" required value="{{ c.get('name', '') }}">
-  <label>Phone</label><input name="phone" type="tel" inputmode="tel" required value="{{ c.get('phone', '') }}">
-  <label>Address</label><textarea name="address" rows="2">{{ c.get('address', '') }}</textarea>
-  <button class="btn block mt">Save</button>
+  <label style="margin-top:0">{{ _('Name') }}</label><input name="name" required value="{{ c.get('name', '') }}">
+  <label>{{ _('Phone') }}</label><input name="phone" type="tel" inputmode="tel" required value="{{ c.get('phone', '') }}">
+  <label>{{ _('Address') }}</label><textarea name="address" rows="2">{{ c.get('address', '') }}</textarea>
+  <button class="btn block mt">{{ _('Save') }}</button>
 </form>
 {% endblock %}

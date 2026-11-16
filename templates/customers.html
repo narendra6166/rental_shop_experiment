@@ -1,15 +1,15 @@
 {% extends "base.html" %}
 {% from "_macros.html" import empty %}
-{% block title %}Customers{% endblock %}
-{% block fab %}<a class="fab noprint" href="{{ url_for('customer_new') }}">＋ Customer</a>{% endblock %}
+{% block title %}{{ _('Customers') }}{% endblock %}
+{% block fab %}<a class="fab noprint" href="{{ url_for('customer_new') }}">＋ {{ _('Customer') }}</a>{% endblock %}
 {% block content %}
-<form class="search" style="margin-top:0" method="get"><input name="q" placeholder="Search name or phone" value="{{ q }}"><button>🔍</button></form>
+<form class="search" style="margin-top:0" method="get"><input name="q" placeholder="{{ _('Search name or phone') }}" value="{{ q }}"><button>🔍</button></form>
 <div style="height:12px"></div>
 {% for c in customers %}
 <div class="card row">
   <div class="avatar">{{ c.name[:1]|upper }}</div>
   <div class="grow"><strong>{{ c.name }}</strong><div class="muted">{{ c.phone }}{% if c.address %} · {{ c.address }}{% endif %}</div></div>
-  <a class="btn light sm" href="{{ url_for('booking_new', customer_id=c.id) }}">Book</a>
+  <a class="btn light sm" href="{{ url_for('booking_new', customer_id=c.id) }}">{{ _('Book') }}</a>
 </div>
-{% else %}{{ empty('🧑', 'No customers found') }}{% endfor %}
+{% else %}{{ empty('🧑', _('No customers found')) }}{% endfor %}
 {% endblock %}

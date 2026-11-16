@@ -11,17 +11,17 @@
 </div>
 
 <div class="stats">
-  <div class="stat hl"><b>{{ s.due|money }}</b><span>Salary due</span></div>
-  <div class="stat"><b>{{ s.earned|money }}</b><span>Earned ({{ s.paid_days|round(1) }} of {{ s.days_in_month }} days)</span></div>
-  <div class="stat"><b>{{ s.paid|money }}</b><span>Paid / advance</span></div>
-  <div class="stat"><b>{{ p.monthly_salary|money }}</b><span>Monthly salary</span></div>
+  <div class="stat hl"><b>{{ s.due|money }}</b><span>{{ _('Salary due') }}</span></div>
+  <div class="stat"><b>{{ s.earned|money }}</b><span>{{ _('Earned ({a} of {b} days)', a=s.paid_days|round(1), b=s.days_in_month) }}</span></div>
+  <div class="stat"><b>{{ s.paid|money }}</b><span>{{ _('Paid / advance') }}</span></div>
+  <div class="stat"><b>{{ p.monthly_salary|money }}</b><span>{{ _('Monthly salary') }}</span></div>
 </div>
 
-<div class="section"><h2>Attendance</h2><a href="{{ url_for('staff.attendance') }}">Mark</a></div>
+<div class="section"><h2>{{ _('Attendance') }}</h2><a href="{{ url_for('staff.attendance') }}">{{ _('Mark') }}</a></div>
 <div class="card">
   <div class="row wrapflex">
-    <span class="pill green">Present {{ s.counts.Present }}</span><span class="pill orange">Half {{ s.counts.Half }}</span>
-    <span class="pill red">Absent {{ s.counts.Absent }}</span><span class="pill purple">Leave {{ s.counts.Leave }}</span>
+    <span class="pill green">{{ _('Present') }} {{ s.counts.Present }}</span><span class="pill orange">{{ _('Half') }} {{ s.counts.Half }}</span>
+    <span class="pill red">{{ _('Absent') }} {{ s.counts.Absent }}</span><span class="pill purple">{{ _('Leave') }} {{ s.counts.Leave }}</span>
   </div>
   <div class="dots">
     {% for d in range(1, s.days_in_month + 1) %}
@@ -29,26 +29,26 @@
     <div class="dot {{ days.get(key, '') }}">{{ d }}</div>
     {% endfor %}
   </div>
-  <div class="muted mt">{{ s.days_in_month - s.marked }} days not marked. Leave counts as paid.</div>
+  <div class="muted mt">{{ _('{n} days not marked. Leave counts as paid.', n=s.days_in_month - s.marked) }}</div>
 </div>
 
-<div class="section"><h2>Payments</h2></div>
+<div class="section"><h2>{{ _('Payments') }}</h2></div>
 <div class="card">
   {% for pay in s.payments %}
   <div class="row between" style="padding:6px 0">
-    <div><b>{{ pay.kind }}</b> · {{ pay.paid_on|dmy }}{% if pay.note %}<div class="muted">{{ pay.note }}</div>{% endif %}</div>
+    <div><b>{{ _(pay.kind) }}</b> · {{ pay.paid_on|dmy }}{% if pay.note %}<div class="muted">{{ pay.note }}</div>{% endif %}</div>
     <div class="row"><b>{{ pay.amount|money }}</b>
-      <form class="inline" method="post" action="{{ url_for('staff.staff_pay_delete', staff_id=p.id, pay_id=pay.id) }}" onsubmit="return confirm('Remove this payment?')"><button class="btn danger sm">✕</button></form></div>
+      <form class="inline" method="post" action="{{ url_for('staff.staff_pay_delete', staff_id=p.id, pay_id=pay.id) }}" onsubmit="return confirm({{ _('Remove this payment?')|tojson|forceescape }})"><button class="btn danger sm">✕</button></form></div>
   </div>
-  {% else %}<div class="muted">No payments this month</div>{% endfor %}
+  {% else %}<div class="muted">{{ _('No payments this month') }}</div>{% endfor %}
   <form method="post" action="{{ url_for('staff.staff_pay', staff_id=p.id) }}" class="mt">
     <input type="hidden" name="month" value="{{ month }}">
     <div class="grid2">
-      <input type="number" inputmode="decimal" name="amount" min="1" step="1" placeholder="Amount ₹" required value="{{ s.due|round(0)|int if s.due > 0 else '' }}">
-      <select name="kind">{% for k in kinds %}<option>{{ k }}</option>{% endfor %}</select>
+      <input type="number" inputmode="decimal" name="amount" min="1" step="1" placeholder="{{ _('Amount ₹') }}" required value="{{ s.due|round(0)|int if s.due > 0 else '' }}">
+      <select name="kind">{% for k in kinds %}<option value="{{ k }}">{{ _(k) }}</option>{% endfor %}</select>
     </div>
-    <input name="note" placeholder="Note (optional)" class="mt">
-    <button class="btn block mt">Record payment</button>
+    <input name="note" placeholder="{{ _('Note (optional)') }}" class="mt">
+    <button class="btn block mt">{{ _('Record payment') }}</button>
   </form>
 </div>
 {% endblock %}

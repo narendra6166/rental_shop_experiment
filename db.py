@@ -216,7 +216,7 @@ def status_info(b, today=None):
     if days == 0:
         return "Starts today", "orange", "today"
     if days <= 3:
-        return f"Starts in {days}d", "orange", "soon"
+        return "Starts in {d}d", "orange", "soon", days
     return "Upcoming", "purple", "upcoming"
 
 

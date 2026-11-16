@@ -1,25 +1,25 @@
 {% extends "base.html" %}
-{% block title %}Report damage{% endblock %}
+{% block title %}{{ _('Report damage') }}{% endblock %}
 {% block fab %}{% endblock %}
 {% block content %}
 <form method="post" class="card">
-  <label style="margin-top:0">Item</label>
+  <label style="margin-top:0">{{ _('Item') }}</label>
   <select name="item_id" required>
-    <option value="">Select item</option>
+    <option value="">{{ _('Select item') }}</option>
     {% for i in items %}<option value="{{ i.id }}" {{ 'selected' if form.get('item_id')|string == i.id|string }}>{{ i.name }}</option>{% endfor %}
   </select>
   <div class="grid2">
-    <div><label>Quantity</label><input type="number" inputmode="numeric" min="1" name="qty" required value="{{ form.get('qty', 1) }}"></div>
-    <div><label>Type</label><select name="kind"><option>Damaged</option><option {{ 'selected' if form.get('kind') == 'Lost' }}>Lost</option></select></div>
+    <div><label>{{ _('Quantity') }}</label><input type="number" inputmode="numeric" min="1" name="qty" required value="{{ form.get('qty', 1) }}"></div>
+    <div><label>{{ _('Type') }}</label><select name="kind"><option value="Damaged">{{ _('Damaged') }}</option><option value="Lost" {{ 'selected' if form.get('kind') == 'Lost' }}>{{ _('Lost') }}</option></select></div>
   </div>
-  <label>Booking (optional)</label>
+  <label>{{ _('Booking (optional)') }}</label>
   <select name="booking_id">
-    <option value="">— none —</option>
-    {% for b in bookings %}<option value="{{ b.id }}" {{ 'selected' if form.get('booking_id')|string == b.id|string }}>#{{ b.id }} · {{ b.name }} · {{ b.event_type }}</option>{% endfor %}
+    <option value="">{{ _('— none —') }}</option>
+    {% for b in bookings %}<option value="{{ b.id }}" {{ 'selected' if form.get('booking_id')|string == b.id|string }}>#{{ b.id }} · {{ b.name }} · {{ _(b.event_type) }}</option>{% endfor %}
   </select>
-  <label>Charge to customer (₹)</label>
+  <label>{{ _('Charge to customer (₹)') }}</label>
   <input type="number" inputmode="decimal" min="0" step="0.01" name="charge" value="{{ form.get('charge', 0) }}">
-  <label>Note</label><textarea name="note" rows="2" placeholder="What happened?">{{ form.get('note', '') }}</textarea>
-  <button class="btn block mt">Save</button>
+  <label>{{ _('Note') }}</label><textarea name="note" rows="2" placeholder="{{ _('What happened?') }}">{{ form.get('note', '') }}</textarea>
+  <button class="btn block mt">{{ _('Save') }}</button>
 </form>
 {% endblock %}

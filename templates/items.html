@@ -1,15 +1,15 @@
 {% extends "base.html" %}
-{% block title %}Inventory{% endblock %}
-{% block subtitle %}<small>Items, rates &amp; deposits</small>{% endblock %}
-{% block fab %}<a class="fab noprint" href="{{ url_for('item_form') }}">＋ Item</a>{% endblock %}
+{% block title %}{{ _('Inventory') }}{% endblock %}
+{% block subtitle %}<small>{{ _('Items, rates & deposits') }}</small>{% endblock %}
+{% block fab %}<a class="fab noprint" href="{{ url_for('item_form') }}">＋ {{ _('Item') }}</a>{% endblock %}
 {% block content %}
 {% for i in items %}
 <div class="card">
   <div class="row between"><strong>{{ i.name }}</strong><span class="pill purple">{{ i.category }}</span></div>
-  <div class="muted mt">{{ i.total_qty }} in stock · {{ i.rate_per_day|money }}/day · deposit {{ i.deposit|money }}</div>
+  <div class="muted mt">{{ _('{n} in stock', n=i.total_qty) }} · {{ i.rate_per_day|money }}{{ _('/day') }} · {{ _('deposit') }} {{ i.deposit|money }}</div>
   <div class="row mt">
-    <a class="btn light sm" href="{{ url_for('item_form', item_id=i.id) }}">Edit</a>
-    <form class="inline" method="post" action="{{ url_for('item_delete', item_id=i.id) }}" onsubmit="return confirm('Delete this item?')"><button class="btn danger sm">Delete</button></form>
+    <a class="btn light sm" href="{{ url_for('item_form', item_id=i.id) }}">{{ _('Edit') }}</a>
+    <form class="inline" method="post" action="{{ url_for('item_delete', item_id=i.id) }}" onsubmit="return confirm({{ _('Delete this item?')|tojson|forceescape }})"><button class="btn danger sm">{{ _('Delete') }}</button></form>
   </div>
 </div>
 {% endfor %}

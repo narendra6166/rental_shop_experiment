@@ -3,9 +3,11 @@ import sqlite3
 import tempfile
 from datetime import date, datetime, timedelta
 
-from flask import Flask, flash, redirect, render_template, request, send_file, url_for
+from flask import (Flask, flash, make_response, redirect, render_template, request, send_file,
+                   url_for)
 
 import db as core
+from i18n import LANGS, _, fmt_date, get_lang
 from db import (EVENT_TYPES, PAYMENT_KINDS, STATUS_TABS, STATUSES, available_qty,
                 booking_totals, get_db, parse_date, status_info)
 from staff import staff_bp
@@ -19,7 +21,18 @@ app.teardown_appcontext(core.close_db)
 app.register_blueprint(staff_bp)
 app.register_blueprint(stock_bp)
 app.jinja_env.globals.update(status_info=status_info, shop_name=SHOP_NAME, today=date.today,
-                           timedelta=timedelta)
+                           timedelta=timedelta, _=_, get_lang=get_lang, langs=LANGS)
+
+
+@app.route("/lang/<code>")
+def set_language(code):
+    target = request.args.get("next") or request.referrer or url_for("dashboard")
+    if not target.startswith("/") or target.startswith("//"):
+        target = url_for("dashboard")
+    resp = make_response(redirect(target))
+    if code in LANGS:
+        resp.set_cookie("lang", code, max_age=60 * 60 * 24 * 365, samesite="Lax")
+    return resp
 
 
 @app.template_filter("money")
@@ -31,7 +44,12 @@ def money(v):
 @app.template_filter("dmy")
 def dmy(v):
     d = parse_date(v)
-    return d.strftime("%d %b") if d else v
+    return fmt_date(d, "%d %b") if d else v
+
+
+@app.template_filter("ldate")
+def ldate(d, pattern):
+    return fmt_date(d, pattern)
 
 
 def booking_rows(where="", args=()):
@@ -121,7 +139,7 @@ def item_form(item_id=None):
             if not data[0] or not data[1] or min(data[2:]) < 0:
                 raise ValueError
         except (KeyError, ValueError):
-            flash("Please enter valid item details.", "error")
+            flash(_("Please enter valid item details."), "error")
             return render_template("item_form.html", item=request.form, item_id=item_id)
         if item_id:
             db.execute(
@@ -134,7 +152,7 @@ def item_form(item_id=None):
                 data,
             )
         db.commit()
-        flash("Item saved.", "ok")
+        flash(_("Item saved."), "ok")
         return redirect(url_for("items"))
     return render_template("item_form.html", item=item, item_id=item_id)
 
@@ -145,9 +163,9 @@ def item_delete(item_id):
     try:
         db.execute("DELETE FROM items WHERE id = ?", (item_id,))
         db.commit()
-        flash("Item deleted.", "ok")
+        flash(_("Item deleted."), "ok")
     except sqlite3.IntegrityError:
-        flash("Item is used in bookings or damage records and cannot be deleted.", "error")
+        flash(_("Item is used in bookings or damage records and cannot be deleted."), "error")
     return redirect(url_for("items"))
 
 
@@ -168,7 +186,7 @@ def customer_new():
         name = request.form.get("name", "").strip()
         phone = request.form.get("phone", "").strip()
         if not name or not phone:
-            flash("Name and phone are required.", "error")
+            flash(_("Name and phone are required."), "error")
             return render_template("customer_form.html", c=request.form)
         db = get_db()
         cur = db.execute(
@@ -176,7 +194,7 @@ def customer_new():
             (name, phone, request.form.get("address", "").strip()),
         )
         db.commit()
-        flash("Customer added.", "ok")
+        flash(_("Customer added."), "ok")
         if request.args.get("next") == "booking":
             return redirect(url_for("booking_new", customer_id=cur.lastrowid))
         return redirect(url_for("customers"))
@@ -225,30 +243,31 @@ def booking_new():
     if request.method == "POST":
         errors = []
         if not form.get("customer_id", "").isdigit():
-            errors.append("Select a customer.")
+            errors.append(_("Select a customer."))
         if not (start and end) or end < start:
-            errors.append("Enter valid start and end dates (end on/after start).")
+            errors.append(_("Enter valid start and end dates (end on/after start)."))
         try:
             discount = float(form.get("discount") or 0)
             if discount < 0:
                 raise ValueError
         except ValueError:
-            errors.append("Invalid discount.")
+            errors.append(_("Invalid discount."))
             discount = 0
         chosen = []
         for i in all_items:
             raw = form.get(f"qty_{i['id']}", "").strip()
             if raw:
                 if not raw.isdigit():
-                    errors.append(f"Invalid quantity for {i['name']}.")
+                    errors.append(_("Invalid quantity for {name}.", name=i["name"]))
                 elif int(raw) > 0:
                     chosen.append((i, int(raw)))
         if not chosen:
-            errors.append("Select at least one item.")
+            errors.append(_("Select at least one item."))
         if avail:
             for i, q in chosen:
                 if q > avail[i["id"]]:
-                    errors.append(f"Only {avail[i['id']]} of {i['name']} available for those dates.")
+                    errors.append(_("Only {n} of {name} available for those dates.",
+                                    n=avail[i["id"]], name=i["name"]))
         if errors:
             for e in errors:
                 flash(e, "error")
@@ -274,7 +293,7 @@ def booking_new():
                     (bid, advance, "Advance", date.today().isoformat()),
                 )
             db.commit()
-            flash("Booking created.", "ok")
+            flash(_("Booking created."), "ok")
             return redirect(url_for("booking_view", booking_id=bid))
 
     return render_template("booking_form.html", customers=custs, items=all_items, avail=avail,
@@ -313,9 +332,9 @@ def booking_status(booking_id):
         db = get_db()
         db.execute("UPDATE bookings SET status = ? WHERE id = ?", (status, booking_id))
         db.commit()
-        flash("Booking updated.", "ok")
+        flash(_("Booking updated."), "ok")
         if status == "Returned":
-            flash("Items back? Report any damaged or lost items below.", "ok")
+            flash(_("Items back? Report any damaged or lost items below."), "ok")
     return redirect(url_for("booking_view", booking_id=booking_id))
 
 
@@ -326,7 +345,7 @@ def booking_payment(booking_id):
         if amount <= 0:
             raise ValueError
     except (KeyError, ValueError):
-        flash("Enter a valid amount.", "error")
+        flash(_("Enter a valid amount."), "error")
         return redirect(url_for("booking_view", booking_id=booking_id))
     kind = request.form.get("kind")
     if kind not in PAYMENT_KINDS:
@@ -337,7 +356,7 @@ def booking_payment(booking_id):
         (booking_id, amount, kind, date.today().isoformat()),
     )
     db.commit()
-    flash("Payment recorded.", "ok")
+    flash(_("Payment recorded."), "ok")
     return redirect(url_for("booking_view", booking_id=booking_id))
 
 
@@ -346,7 +365,7 @@ def booking_delete(booking_id):
     db = get_db()
     db.execute("DELETE FROM bookings WHERE id = ?", (booking_id,))
     db.commit()
-    flash("Booking deleted.", "ok")
+    flash(_("Booking deleted."), "ok")
     return redirect(url_for("bookings"))
 
 
