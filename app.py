@@ -60,25 +60,34 @@ def ldate(d, pattern):
 
 
 def booking_rows(where="", args=()):
-    return get_db().execute(
+    db = get_db()
+    rows = db.execute(
         f"""SELECT b.*, c.name AS customer, c.phone FROM bookings b
             JOIN customers c ON c.id = b.customer_id {where}
             ORDER BY b.start_date""",
         args,
     ).fetchall()
+    result = []
+    for r in rows:
+        d = dict(r)
+        d["balance"] = booking_totals(db, r["id"])["balance"]
+        result.append(d)
+    return result
 
 
 @app.route("/")
 def dashboard():
     db = get_db()
     month = date.today().strftime("%Y-%m")
-    active = [b for b in booking_rows() if b["status"] not in ("Cancelled", "Returned")]
+    active = [b for b in booking_rows()
+              if b["status"] != "Cancelled" and status_info(b)[2] != "done"]
     by_key = {}
     for b in active:
         by_key.setdefault(status_info(b)[2], []).append(b)
-    needs_action = by_key.get("pending", []) + by_key.get("today", []) + by_key.get("overdue", [])
+    needs_action = (by_key.get("pending", []) + by_key.get("today", []) + by_key.get("overdue", [])
+                    + by_key.get("payment", []))
     soon = by_key.get("soon", [])
-    on_work = by_key.get("onwork", [])
+    on_work = by_key.get("onwork", []) + by_key.get("workdone", [])
     totals = [(b, booking_totals(db, b["id"])) for b in booking_rows() if b["status"] != "Cancelled"]
     balance_due = sum(max(t["balance"], 0) for b, t in totals)
     refunds_due = sum(-t["balance"] for b, t in totals if b["status"] == "Returned" and t["balance"] < 0)
@@ -309,18 +318,43 @@ def bookings():
                            tab=tab, counts=counts, q=q)
 
 
+def money_field(form, name, errors, label):
+    try:
+        v = float(form.get(name) or 0)
+        if v < 0:
+            raise ValueError
+        return v
+    except ValueError:
+        errors.append(_("Invalid {label}.", label=_(label)))
+        return 0
+
+
 @app.route("/bookings/new", methods=["GET", "POST"])
-def booking_new():
+@app.route("/bookings/<int:booking_id>/edit", methods=["GET", "POST"])
+def booking_new(booking_id=None):
     db = get_db()
+    existing = None
+    if booking_id:
+        existing = db.execute("SELECT * FROM bookings WHERE id = ?", (booking_id,)).fetchone()
+        if not existing:
+            return redirect(url_for("bookings"))
     custs = db.execute("SELECT * FROM customers ORDER BY name").fetchall()
     all_items = db.execute("SELECT * FROM items ORDER BY category, name").fetchall()
-    form = request.form if request.method == "POST" else request.args
+    if request.method == "POST":
+        form = request.form
+    elif existing and not request.args:
+        form = {k: existing[k] for k in existing.keys()}
+        form["customer_id"] = existing["customer_id"]
+        for l in db.execute("SELECT item_id, qty FROM booking_items WHERE booking_id = ?", (booking_id,)):
+            form[f"qty_{l['item_id']}"] = l["qty"]
+    else:
+        form = request.args
 
     start_s, end_s = form.get("start_date", ""), form.get("end_date", "")
     start, end = parse_date(start_s), parse_date(end_s)
     avail = {}
     if start and end and end >= start:
-        avail = {i["id"]: available_qty(db, i, start_s, end_s) for i in all_items}
+        avail = {i["id"]: available_qty(db, i, start_s, end_s, booking_id) for i in all_items}
 
     if request.method == "POST":
         errors = []
@@ -328,13 +362,10 @@ def booking_new():
             errors.append(_("Select a customer."))
         if not (start and end) or end < start:
             errors.append(_("Enter valid start and end dates (end on/after start)."))
-        try:
-            discount = float(form.get("discount") or 0)
-            if discount < 0:
-                raise ValueError
-        except ValueError:
-            errors.append(_("Invalid discount."))
-            discount = 0
+        discount = money_field(form, "discount", errors, "Discount")
+        travel = money_field(form, "travel_charge", errors, "Travel charges")
+        labour = money_field(form, "labour_charge", errors, "Labour charges")
+        damage = money_field(form, "damage_charge", errors, "Damage charges")
         chosen = []
         for i in all_items:
             raw = form.get(f"qty_{i['id']}", "").strip()
@@ -354,32 +385,46 @@ def booking_new():
             for e in errors:
                 flash(e, "error")
         else:
-            cur = db.execute(
-                """INSERT INTO bookings (customer_id, event_type, start_date, end_date, discount, notes, created_at)
-                   VALUES (?,?,?,?,?,?,?)""",
-                (int(form["customer_id"]), form.get("event_type", "Other"), start_s, end_s,
-                 discount, form.get("notes", "").strip(), datetime.now().isoformat(timespec="seconds")),
-            )
-            bid = cur.lastrowid
+            fields = (int(form["customer_id"]), form.get("event_type", "Other"), start_s, end_s,
+                      discount, travel, labour, damage, form.get("notes", "").strip())
+            if existing:
+                bid = booking_id
+                old = {r["item_id"]: r for r in db.execute(
+                    "SELECT * FROM booking_items WHERE booking_id = ?", (bid,))}
+                db.execute(
+                    """UPDATE bookings SET customer_id=?, event_type=?, start_date=?, end_date=?, discount=?,
+                       travel_charge=?, labour_charge=?, damage_charge=?, notes=? WHERE id=?""",
+                    fields + (bid,))
+                db.execute("DELETE FROM booking_items WHERE booking_id = ?", (bid,))
+            else:
+                cur = db.execute(
+                    """INSERT INTO bookings (customer_id, event_type, start_date, end_date, discount,
+                       travel_charge, labour_charge, damage_charge, notes, created_at)
+                       VALUES (?,?,?,?,?,?,?,?,?,?)""",
+                    fields + (datetime.now().isoformat(timespec="seconds"),))
+                bid, old = cur.lastrowid, {}
+            # Keep the rate the customer was quoted for items that were already on the booking.
             db.executemany(
                 "INSERT INTO booking_items (booking_id, item_id, qty, rate, deposit) VALUES (?,?,?,?,?)",
-                [(bid, i["id"], q, i["rate_per_day"], i["deposit"]) for i, q in chosen],
+                [(bid, i["id"], q, old[i["id"]]["rate"] if i["id"] in old else i["rate_per_day"],
+                  old[i["id"]]["deposit"] if i["id"] in old else i["deposit"]) for i, q in chosen],
             )
-            try:
-                advance = float(form.get("advance") or 0)
-            except ValueError:
-                advance = 0
-            if advance > 0:
-                db.execute(
-                    "INSERT INTO payments (booking_id, amount, kind, paid_on) VALUES (?,?,?,?)",
-                    (bid, advance, "Advance", date.today().isoformat()),
-                )
+            if not existing:
+                try:
+                    advance = float(form.get("advance") or 0)
+                except ValueError:
+                    advance = 0
+                if advance > 0:
+                    db.execute(
+                        "INSERT INTO payments (booking_id, amount, kind, paid_on) VALUES (?,?,?,?)",
+                        (bid, advance, "Advance", date.today().isoformat()),
+                    )
             db.commit()
-            flash(_("Booking created."), "ok")
+            flash(_("Booking updated.") if existing else _("Booking created."), "ok")
             return redirect(url_for("booking_view", booking_id=bid))
 
     return render_template("booking_form.html", customers=custs, items=all_items, avail=avail,
-                           form=form, event_types=EVENT_TYPES)
+                           form=form, event_types=EVENT_TYPES, editing=existing)
 
 
 def load_booking(booking_id):
@@ -395,7 +440,8 @@ def booking_view(booking_id):
     b = load_booking(booking_id)
     if not b:
         return redirect(url_for("bookings"))
-    return render_template("booking_view.html", b=b, t=booking_totals(get_db(), booking_id),
+    t = booking_totals(get_db(), booking_id)
+    return render_template("booking_view.html", b=dict(b, balance=t["balance"]), t=t,
                            kinds=PAYMENT_KINDS)
 
 
