@@ -41,17 +41,29 @@
 <div class="section"><h2>{{ _('Bill') }}</h2><a href="{{ url_for('invoice', booking_id=b.id) }}" target="_blank">🧾 {{ _('Invoice') }}</a></div>
 <div class="card">
   <table class="lines">
+    {% if t.cancelled %}
+    <tr><td>{{ _('Cancellation fee') }}</td><td class="num">{{ t.cancel_fee|money }}</td></tr>
+    {% else %}
     <tr><td>{{ _('Rent') }}</td><td class="num">{{ t.rent|money }}</td></tr>
     {% if t.discount %}<tr><td>{{ _('Discount') }}</td><td class="num">-{{ t.discount|money }}</td></tr>{% endif %}
     <tr><td>{{ _('Refundable deposit') }}{% if t.deposit_returned %} ({{ _('returned separately') }}){% endif %}</td><td class="num">{{ t.deposit|money }}</td></tr>
     {% if t.travel %}<tr><td>{{ _('Travel charges') }}</td><td class="num">{{ t.travel|money }}</td></tr>{% endif %}
     {% if t.labour %}<tr><td>{{ _('Labour charges') }}</td><td class="num">{{ t.labour|money }}</td></tr>{% endif %}
     {% if t.damage %}<tr><td>{{ _('Damage charges') }}</td><td class="num">{{ t.damage|money }}</td></tr>{% endif %}
+    {% endif %}
     <tr class="total"><td>{{ _('Total') }}</td><td class="num">{{ t.total|money }}</td></tr>
     <tr><td>{{ _('Paid') }}</td><td class="num">{{ t.paid|money }}</td></tr>
-    {% if t.refunded %}<tr><td>{{ _('Deposit refunded') }}</td><td class="num">-{{ t.refunded|money }}</td></tr>{% endif %}
+    {% if t.refunded %}<tr><td>{{ _('Refunded') }}</td><td class="num">-{{ t.refunded|money }}</td></tr>{% endif %}
     <tr class="total"><td>{{ _('Deposit to refund') if t.balance < 0 else _('Balance due') }}</td><td class="num" style="color:{{ 'var(--red)' if t.balance > 0 else 'var(--green)' }}">{{ t.balance|abs|money }}</td></tr>
   </table>
+  {% if t.cancelled %}
+  <form method="post" action="{{ url_for('booking_cancel_fee', booking_id=b.id) }}" class="mt">
+    <label style="margin-top:0">{{ _('Cancellation fee kept by shop (₹)') }}</label>
+    <div class="grid2"><input type="number" inputmode="decimal" min="0" step="0.01" name="cancel_fee" value="{{ t.cancel_fee }}">
+      <button class="btn light">{{ _('Save') }}</button></div>
+    <div class="muted mt">{{ _('Anything paid above this is shown as a refund due. Record the refund below as "Deposit refund".') }}</div>
+  </form>
+  {% endif %}
 </div>
 
 <div class="section"><h2>{{ _('Payments') }}</h2></div>

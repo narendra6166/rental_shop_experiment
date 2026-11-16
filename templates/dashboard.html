@@ -43,6 +43,10 @@
   <div class="stat"><b>{{ stats.soon }}</b><span>{{ _('Starting soon') }}</span></div>
 </div>
 
+{% if stats.staff_unmarked and stats.staff_total %}
+<a class="card row" href="{{ url_for('staff.attendance') }}"><span style="font-size:1.6rem">⏰</span><div class="grow"><strong>{{ _("Today's attendance not marked") }}</strong><div class="muted">{{ _('{n} staff still to mark', n=stats.staff_unmarked) }}</div></div>›</a>
+{% endif %}
+
 {% if needs_action %}
 <div class="section"><h2>⚠️ {{ _('Needs action') }}</h2></div>
 {% for b in needs_action %}{{ booking_card(b) }}{% endfor %}

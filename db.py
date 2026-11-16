@@ -136,6 +136,7 @@ MIGRATIONS = {
         ("travel_charge", "REAL NOT NULL DEFAULT 0"),
         ("labour_charge", "REAL NOT NULL DEFAULT 0"),
         ("damage_charge", "REAL NOT NULL DEFAULT 0"),
+        ("cancel_fee", "REAL NOT NULL DEFAULT 0"),
     ],
 }
 
@@ -309,13 +310,16 @@ def booking_totals(db, booking_id):
     # Deposit is no longer owed once the items are back; it then only appears as a refund.
     returned = b["status"] == "Returned"
     cancelled = b["status"] == "Cancelled"
-    total = 0 if cancelled else charges + (0 if returned else deposit)
+    if cancelled:
+        # Only the cancellation fee the shop keeps is owed; any other money paid is refundable.
+        charges = b["cancel_fee"]
+    total = charges if cancelled else charges + (0 if returned else deposit)
     net_paid = paid - refunded
     return {
         "days": days, "lines": lines, "damages": damages, "rent": rent,
         "discount": b["discount"], "net_rent": net_rent, "deposit": deposit,
         "damage": damage, "travel": travel, "labour": labour, "charges": charges, "total": total, "paid": paid,
-        "refunded": refunded, "net_paid": net_paid, "deposit_returned": returned,
+        "refunded": refunded, "net_paid": net_paid, "deposit_returned": returned, "cancelled": cancelled, "cancel_fee": b["cancel_fee"],
         # > 0: customer still owes this; < 0: shop owes the customer a refund
         "balance": total - net_paid, "payments": payments,
     }
@@ -358,7 +362,7 @@ def month_finance(db, month):
         "FROM payments WHERE paid_on LIKE ?", (like,)).fetchone()[0]
     # Rental income is booked in the month the event starts; deposits are not income.
     revenue = 0
-    for b in db.execute("SELECT id FROM bookings WHERE start_date LIKE ? AND status != 'Cancelled'",
+    for b in db.execute("SELECT id FROM bookings WHERE start_date LIKE ?",
                         (like,)).fetchall():
         revenue += booking_totals(db, b["id"])["charges"]
     shop_expenses = db.execute(
