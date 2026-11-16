@@ -15,5 +15,7 @@
 <a class="card row" href="{{ url_for('stock.damages') }}"><span style="font-size:1.6rem">🛠️</span><div class="grow"><strong>{{ _('Damaged & lost items') }}</strong><div class="muted">{{ _('Repairs, write-offs, charges') }}</div></div>›</a>
 <a class="card row" href="{{ url_for('staff.attendance') }}"><span style="font-size:1.6rem">✅</span><div class="grow"><strong>{{ _('Attendance') }}</strong><div class="muted">{{ _('Mark staff present / absent') }}</div></div>›</a>
 <a class="card row" href="{{ url_for('staff.staff_list') }}"><span style="font-size:1.6rem">💰</span><div class="grow"><strong>{{ _('Staff & salaries') }}</strong><div class="muted">{{ _('Salary due, advances, payments') }}</div></div>›</a>
+<a class="card row" href="{{ url_for('expenses') }}"><span style="font-size:1.6rem">🧾</span><div class="grow"><strong>{{ _('Expenses') }}</strong><div class="muted">{{ _('Shop rent, new stock purchases, other costs') }}</div></div>›</a>
+<a class="card row" href="{{ url_for('finance') }}"><span style="font-size:1.6rem">📊</span><div class="grow"><strong>{{ _('Finance report') }}</strong><div class="muted">{{ _('Income, expenses and profit by month') }}</div></div>›</a>
 <a class="card row" href="{{ url_for('backup') }}"><span style="font-size:1.6rem">💾</span><div class="grow"><strong>{{ _('Download backup') }}</strong><div class="muted">{{ _('Save all your data as a file') }}</div></div>›</a>
 {% endblock %}

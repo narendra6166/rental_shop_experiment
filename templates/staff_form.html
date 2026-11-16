@@ -8,8 +8,16 @@
   <label>{{ _('Role') }}</label><input name="role" required list="roles" placeholder="{{ _('Driver, Helper, Cook...') }}" value="{{ p.get('role', '') }}">
   <datalist id="roles"><option>Driver</option><option>Helper</option><option>Loader</option><option>Tent worker</option><option>Supervisor</option></datalist>
   <div class="grid2">
-    <div><label>{{ _('Monthly salary (₹)') }}</label><input type="number" inputmode="decimal" min="0" step="1" name="monthly_salary" required value="{{ p.get('monthly_salary', '') }}"></div>
-    <div><label>{{ _('Joining date') }}</label><input type="date" name="join_date" value="{{ p.get('join_date', '') or '' }}"></div>
+    <div><label>{{ _('Salary type') }}</label>
+      <select name="salary_type">{% for st in salary_types %}<option value="{{ st }}" {{ 'selected' if p.get('salary_type', 'Monthly') == st }}>{{ _(st) }}</option>{% endfor %}</select></div>
+    <div><label>{{ _('Salary amount (₹) — per month or per day') }}</label><input type="number" inputmode="decimal" min="0" step="1" name="monthly_salary" required value="{{ p.get('monthly_salary', '') }}"></div>
+  </div>
+  <label>{{ _('Joining date') }}</label><input type="date" name="join_date" value="{{ p.get('join_date', '') or '' }}">
+  <label>{{ _('Complete address') }}</label><textarea name="address" rows="3">{{ p.get('address', '') or '' }}</textarea>
+  <div class="grid2">
+    <div><label>{{ _('ID proof') }}</label>
+      <select name="id_type"><option value="">—</option>{% for it in id_types %}<option value="{{ it }}" {{ 'selected' if p.get('id_type') == it }}>{{ _(it) }}</option>{% endfor %}</select></div>
+    <div><label>{{ _('ID number') }}</label><input name="id_number" value="{{ p.get('id_number', '') or '' }}"></div>
   </div>
   {% if staff_id %}
   <label>{{ _('Status') }}</label>

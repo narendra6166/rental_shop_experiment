@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}{{ _('Finance report') }}{% endblock %}
+{% block subtitle %}<small>{{ _('Income, expenses and profit by month') }}</small>{% endblock %}
+{% block fab %}{% endblock %}
+{% block content %}
+<div class="row between" style="margin-bottom:12px">
+  <a class="btn light sm" href="{{ url_for('finance', month=prev_month) }}">‹</a>
+  <strong>{{ month }}</strong>
+  <a class="btn light sm" href="{{ url_for('finance', month=next_month) }}">›</a>
+</div>
+<div class="stats">
+  <div class="stat hl"><b>{{ f.profit|money }}</b><span>{{ _('Profit') }}</span></div>
+  <div class="stat"><b>{{ f.revenue|money }}</b><span>{{ _('Rental income') }}</span></div>
+  <div class="stat"><b>{{ f.expenses|money }}</b><span>{{ _('Total expenses') }}</span></div>
+  <div class="stat"><b>{{ f.net_cash|money }}</b><span>{{ _('Net cash') }}</span></div>
+</div>
+<div class="card">
+  <div class="row between"><span>{{ _('Rental income') }}</span><b>{{ f.revenue|money }}</b></div>
+  <div class="row between mt"><span>− {{ _('Shop expenses') }}</span><b>{{ f.shop_expenses|money }}</b></div>
+  <div class="row between mt"><span>− {{ _('Staff salaries') }}</span><b>{{ f.salaries|money }}</b></div>
+  <hr>
+  <div class="row between"><strong>{{ _('Profit') }}</strong><b>{{ f.profit|money }}</b></div>
+  <div class="muted mt">{{ _('Income counts rent and damage charges of events starting this month. Deposits are not income.') }}</div>
+</div>
+<div class="card">
+  <div class="row between"><span>{{ _('Cash received (incl. deposits)') }}</span><b>{{ f.received|money }}</b></div>
+  <div class="row between mt"><span>− {{ _('Total expenses') }}</span><b>{{ f.expenses|money }}</b></div>
+  <hr>
+  <div class="row between"><strong>{{ _('Net cash') }}</strong><b>{{ f.net_cash|money }}</b></div>
+</div>
+<div class="section"><h2>{{ _('Expenses by category') }}</h2><a href="{{ url_for('expenses', month=month) }}">{{ _('See all') }}</a></div>
+<div class="card">
+  {% for c in by_category %}<div class="row between" style="padding:4px 0"><span>{{ _(c.category) }}</span><b>{{ c.total|money }}</b></div>
+  {% else %}<div class="muted">{{ _('No expenses this month') }}</div>{% endfor %}
+</div>
+<div class="card">
+  <div class="row between"><span>{{ _('Balance to collect') }}</span><b>{{ to_collect|money }}</b></div>
+  <div class="row between mt"><span>{{ _('Deposits to refund') }}</span><b>{{ to_refund|money }}</b></div>
+</div>
+{% endblock %}

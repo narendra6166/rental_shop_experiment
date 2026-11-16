@@ -67,7 +67,20 @@ CREATE TABLE IF NOT EXISTS staff (
     role TEXT NOT NULL,
     monthly_salary REAL NOT NULL DEFAULT 0,
     join_date TEXT,
-    active INTEGER NOT NULL DEFAULT 1
+    active INTEGER NOT NULL DEFAULT 1,
+    salary_type TEXT NOT NULL DEFAULT 'Monthly',
+    address TEXT,
+    id_type TEXT,
+    id_number TEXT
+);
+CREATE TABLE IF NOT EXISTS expenses (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    category TEXT NOT NULL,
+    amount REAL NOT NULL CHECK (amount > 0),
+    paid_on TEXT NOT NULL,
+    note TEXT,
+    item_id INTEGER REFERENCES items(id) ON DELETE SET NULL,
+    qty INTEGER
 );
 CREATE TABLE IF NOT EXISTS attendance (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -103,6 +116,21 @@ STATUSES = ["Booked", "Delivered", "Returned", "Cancelled"]
 PAYMENT_KINDS = ["Advance", "Payment", "Deposit refund"]
 ATTENDANCE = ["Present", "Half", "Absent", "Leave"]
 SALARY_KINDS = ["Salary", "Advance", "Bonus"]
+SALARY_TYPES = ["Monthly", "Daily"]
+ID_TYPES = ["Aadhaar", "PAN", "Voter ID", "Driving Licence", "Other"]
+EXPENSE_CATEGORIES = ["Shop rent", "New stock purchase", "Transport / Fuel", "Repairs",
+                      "Electricity & water", "Other"]
+STOCK_PURCHASE = "New stock purchase"
+
+# Columns added after the first release; applied to existing databases on start-up.
+MIGRATIONS = {
+    "staff": [
+        ("salary_type", "TEXT NOT NULL DEFAULT 'Monthly'"),
+        ("address", "TEXT"),
+        ("id_type", "TEXT"),
+        ("id_number", "TEXT"),
+    ],
+}
 
 # Filter tabs on the bookings page -> derived status keys
 STATUS_TABS = [
@@ -132,6 +160,11 @@ def close_db(_exc=None):
 def init_db():
     db = sqlite3.connect(DB_PATH)
     db.executescript(SCHEMA)
+    for table, columns in MIGRATIONS.items():
+        existing = {r[1] for r in db.execute(f"PRAGMA table_info({table})")}
+        for name, ddl in columns:
+            if name not in existing:
+                db.execute(f"ALTER TABLE {table} ADD COLUMN {name} {ddl}")
     if db.execute("SELECT COUNT(*) FROM items").fetchone()[0] == 0:
         db.executemany(
             "INSERT INTO items (name, category, total_qty, rate_per_day, deposit) VALUES (?,?,?,?,?)",
@@ -168,19 +201,31 @@ def rental_days(start, end):
 
 # ---------- Stock ----------
 def booked_qty(db, item_id, start, end, exclude_booking=None):
-    """Max units of an item reserved on any single day within [start, end]."""
+    """Max units of an item unavailable on any single day within [start, end].
+
+    A delivered booking keeps its items out until it is marked returned, so an overdue
+    one blocks stock up to today even though its end date has passed.
+    """
     rows = db.execute(
-        """SELECT b.start_date, b.end_date, bi.qty FROM booking_items bi
+        """SELECT b.start_date, b.end_date, b.status, bi.qty FROM booking_items bi
            JOIN bookings b ON b.id = bi.booking_id
            WHERE bi.item_id = ? AND b.status IN ('Booked', 'Delivered')
-             AND b.start_date <= ? AND b.end_date >= ? AND b.id IS NOT ?""",
-        (item_id, end, start, exclude_booking),
+             AND b.start_date <= ? AND b.id IS NOT ?""",
+        (item_id, end, exclude_booking),
     ).fetchall()
+    today = date.today().isoformat()
+    spans = []
+    for r in rows:
+        last = r["end_date"]
+        if r["status"] == "Delivered" and last < today:
+            last = today
+        if last >= start:
+            spans.append((r["start_date"], last, r["qty"]))
     peak = 0
-    day, last = parse_date(start), parse_date(end)
-    while day <= last:
+    day, last_day = parse_date(start), parse_date(end)
+    while day <= last_day:
         d = day.isoformat()
-        peak = max(peak, sum(r["qty"] for r in rows if r["start_date"] <= d <= r["end_date"]))
+        peak = max(peak, sum(q for s, e, q in spans if s <= d <= e))
         day += timedelta(days=1)
     return peak
 
@@ -242,12 +287,19 @@ def booking_totals(db, booking_id):
     paid = sum(p["amount"] for p in payments if p["kind"] != "Deposit refund")
     refunded = sum(p["amount"] for p in payments if p["kind"] == "Deposit refund")
     net_rent = max(rent - b["discount"], 0)
-    total = net_rent + deposit + damage
+    charges = net_rent + damage
+    # Deposit is no longer owed once the items are back; it then only appears as a refund.
+    returned = b["status"] == "Returned"
+    cancelled = b["status"] == "Cancelled"
+    total = 0 if cancelled else charges + (0 if returned else deposit)
+    net_paid = paid - refunded
     return {
         "days": days, "lines": lines, "damages": damages, "rent": rent,
         "discount": b["discount"], "net_rent": net_rent, "deposit": deposit,
-        "damage": damage, "total": total, "paid": paid, "refunded": refunded,
-        "balance": total - paid + refunded, "payments": payments,
+        "damage": damage, "charges": charges, "total": total, "paid": paid,
+        "refunded": refunded, "net_paid": net_paid, "deposit_returned": returned,
+        # > 0: customer still owes this; < 0: shop owes the customer a refund
+        "balance": total - net_paid, "payments": payments,
     }
 
 
@@ -261,8 +313,11 @@ def salary_summary(db, staff, month):
         (staff["id"], month),
     ):
         counts[r["status"]] = r["c"]
-    paid_days = counts["Present"] + counts["Leave"] + 0.5 * counts["Half"]
-    earned = staff["monthly_salary"] / days_in_month * paid_days
+    daily = staff["salary_type"] == "Daily"
+    # Daily-wage workers are paid only for days worked; monthly staff also get paid leave.
+    paid_days = counts["Present"] + 0.5 * counts["Half"] + (0 if daily else counts["Leave"])
+    rate = staff["monthly_salary"]
+    earned = rate * paid_days if daily else rate / days_in_month * paid_days
     payments = db.execute(
         "SELECT * FROM salary_payments WHERE staff_id = ? AND month = ? ORDER BY id",
         (staff["id"], month),
@@ -272,5 +327,27 @@ def salary_summary(db, staff, month):
     return {
         "counts": counts, "marked": sum(counts.values()), "days_in_month": days_in_month,
         "paid_days": paid_days, "earned": earned, "paid": paid, "bonus": bonus,
-        "due": earned - paid, "payments": payments,
+        "due": earned - paid, "payments": payments, "daily": daily, "rate": rate,
     }
+
+
+# ---------- Finance ----------
+def month_finance(db, month):
+    """Money in/out for a calendar month (YYYY-MM)."""
+    like = month + "%"
+    received = db.execute(
+        "SELECT COALESCE(SUM(CASE WHEN kind='Deposit refund' THEN -amount ELSE amount END), 0) "
+        "FROM payments WHERE paid_on LIKE ?", (like,)).fetchone()[0]
+    # Rental income is booked in the month the event starts; deposits are not income.
+    revenue = 0
+    for b in db.execute("SELECT id FROM bookings WHERE start_date LIKE ? AND status != 'Cancelled'",
+                        (like,)).fetchall():
+        revenue += booking_totals(db, b["id"])["charges"]
+    shop_expenses = db.execute(
+        "SELECT COALESCE(SUM(amount), 0) FROM expenses WHERE paid_on LIKE ?", (like,)).fetchone()[0]
+    salaries = db.execute(
+        "SELECT COALESCE(SUM(amount), 0) FROM salary_payments WHERE paid_on LIKE ?", (like,)).fetchone()[0]
+    expenses = shop_expenses + salaries
+    return {"received": received, "revenue": revenue, "shop_expenses": shop_expenses,
+            "salaries": salaries, "expenses": expenses, "profit": revenue - expenses,
+            "net_cash": received - expenses}
