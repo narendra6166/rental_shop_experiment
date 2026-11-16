@@ -6,6 +6,7 @@ from flask import Blueprint, flash, redirect, render_template, request, url_for
 from db import (ID_TYPES, SALARY_KINDS, SALARY_TYPES, ATTENDANCE, get_db, parse_date, parse_month,
                 salary_summary, shift_month)
 from i18n import _
+from validation import valid_phone
 
 staff_bp = Blueprint("staff", __name__)
 
@@ -46,6 +47,10 @@ def staff_form(staff_id=None):
         except (KeyError, ValueError):
             flash(_("Enter name, role and a valid salary."), "error")
             return render_template("staff_form.html", p=request.form, staff_id=staff_id)
+        phone = request.form.get("phone", "").strip()
+        if phone and not valid_phone(phone):
+            flash(_("Phone number must contain exactly 10 digits."), "error")
+            return render_template("staff_form.html", p=request.form, staff_id=staff_id)
         join = request.form.get("join_date") or date.today().isoformat()
         active = 1 if request.form.get("active", "1") == "1" else 0
         salary_type = request.form.get("salary_type")
@@ -63,7 +68,7 @@ def staff_form(staff_id=None):
             flash(_("Invalid ID number. Aadhaar has 12 digits; PAN looks like ABCDE1234F."), "error")
             return render_template("staff_form.html", p=request.form, staff_id=staff_id)
         db = get_db()
-        data = (name, request.form.get("phone", "").strip(), role, salary, join, active,
+        data = (name, phone, role, salary, join, active,
                 salary_type, request.form.get("address", "").strip(), id_type, id_number)
         if staff_id:
             db.execute(

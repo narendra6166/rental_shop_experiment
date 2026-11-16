@@ -6,6 +6,7 @@
 <meta name="theme-color" content="#4d5a2a">
 <title>{% block page_title %}{{ _(shop_name) }}{% endblock %}</title>
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<script src="{{ url_for('static', filename='forms.js') }}" defer></script>
 </head>
 <body>
 {% set ep = request.endpoint or '' %}

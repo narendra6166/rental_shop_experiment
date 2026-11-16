@@ -4,6 +4,7 @@ Rental management for tents, cooking items, furniture, etc. (marriages, birthday
 
 Features: inventory, customers, bookings with date-based availability checks, advance/payments,
 refundable deposits, status tracking (Booked/Delivered/Returned/Cancelled), overdue alerts, printable invoices.
+Customer phone numbers must be exactly 10 digits; staff phone numbers are optional but follow the same rule when provided.
 
 ## Run
 

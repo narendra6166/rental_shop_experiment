@@ -14,6 +14,7 @@ from db import (EVENT_TYPES, EXPENSE_CATEGORIES, PAYMENT_KINDS, STATUS_TABS, STA
                 parse_month, shift_month, status_info)
 from staff import staff_bp
 from stock import stock_bp
+from validation import valid_phone
 
 SHOP_NAME = os.environ.get("SHOP_NAME", "Ganesh Hyres")
 SHOP_ADDRESS = os.environ.get(
@@ -291,6 +292,9 @@ def customer_new():
         phone = request.form.get("phone", "").strip()
         if not name or not phone:
             flash(_("Name and phone are required."), "error")
+            return render_template("customer_form.html", c=request.form)
+        if not valid_phone(phone):
+            flash(_("Phone number must contain exactly 10 digits."), "error")
             return render_template("customer_form.html", c=request.form)
         db = get_db()
         cur = db.execute(
