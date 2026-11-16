@@ -529,6 +529,7 @@ def booking_delete(booking_id):
 
 # ---------- Optional login (set APP_PASSWORD to turn it on) ----------
 APP_PASSWORD = os.environ.get("APP_PASSWORD", "")
+APP_USER = os.environ.get("APP_USER", "admin")
 app.jinja_env.globals["login_enabled"] = bool(APP_PASSWORD)
 
 
@@ -541,12 +542,13 @@ def require_login():
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
-        if APP_PASSWORD and hmac.compare_digest(request.form.get("password", ""), APP_PASSWORD):
+        if APP_PASSWORD and hmac.compare_digest(request.form.get("user", "").strip(), APP_USER) \
+                and hmac.compare_digest(request.form.get("password", ""), APP_PASSWORD):
             session["auth"] = True
             session.permanent = True
             nxt = request.args.get("next", "")
             return redirect(nxt if nxt.startswith("/") and not nxt.startswith("//") else url_for("dashboard"))
-        flash(_("Wrong password."), "error")
+        flash(_("Wrong ID or password."), "error")
     return render_template("login.html")
 
 
