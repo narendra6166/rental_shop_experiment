@@ -64,6 +64,8 @@ a.card:active { transform: scale(.99); }
 .muted { color: var(--muted); font-size: .88rem; }
 .num { text-align: right; font-variant-numeric: tabular-nums; }
 .mt { margin-top: 10px; }
+.customer-actions { display: flex; flex-direction: column; gap: 6px; flex: none; }
+.customer-actions .btn { display: block; width: 100%; }
 
 /* Pills */
 .pill { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: .75rem; font-weight: 700;

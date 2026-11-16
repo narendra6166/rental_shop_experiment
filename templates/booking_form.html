@@ -4,21 +4,19 @@
 {% block content %}
 <form method="post">
   <div class="card">
-    <label style="margin-top:0">{{ _('Customer') }}</label>
-    <select name="customer_id" required>
-      <option value="">{{ _('Select customer') }}</option>
-      {% for c in customers %}
-      <option value="{{ c.id }}" {{ 'selected' if form.get('customer_id')|string == c.id|string }}>{{ c.name }} ({{ c.phone }})</option>
-      {% endfor %}
-    </select>
-    <p style="margin:8px 0 0"><a class="muted" style="color:var(--primary);font-weight:700" href="{{ url_for('customer_new', next='booking') }}">＋ {{ _('New customer') }}</a></p>
+    <label for="customer_name" style="margin-top:0">{{ _('Customer name') }}</label>
+    <input id="customer_name" name="customer_name" required autocomplete="name" placeholder="{{ _('Enter customer name') }}" value="{{ form.get('customer_name', '') }}">
+    <label for="phone">{{ _('Phone') }}</label>
+    <input id="phone" name="phone" type="tel" inputmode="numeric" autocomplete="tel-national" maxlength="10" pattern="[0-9]{10}" title="{{ _('Phone number must contain exactly 10 digits.') }}" required value="{{ form.get('phone', '') }}">
+    <label for="address">{{ _('Address (optional)') }}</label>
+    <textarea id="address" name="address" rows="2" autocomplete="street-address">{{ form.get('address', '') }}</textarea>
     <label>{{ _('Event type') }}</label>
     <select name="event_type">{% for e in event_types %}<option value="{{ e }}" {{ 'selected' if form.get('event_type') == e }}>{{ _(e) }}</option>{% endfor %}</select>
     <div class="grid2">
       <div><label>{{ _('Start date') }}</label><input type="date" name="start_date" required value="{{ form.get('start_date', '') }}"></div>
       <div><label>{{ _('End date') }}</label><input type="date" name="end_date" required value="{{ form.get('end_date', '') }}"></div>
     </div>
-    <button class="btn light block mt" type="submit" formmethod="get" formaction="{{ url_for('booking_new', booking_id=editing.id) if editing else url_for('booking_new') }}">{{ _('Check stock for these dates') }}</button>
+    <button class="btn light block mt" type="submit" formmethod="get" formnovalidate formaction="{{ url_for('booking_new', booking_id=editing.id) if editing else url_for('booking_new') }}">{{ _('Check stock for these dates') }}</button>
   </div>
 
   <div class="section"><h2>{{ _('Items') }}</h2>{% if not avail %}<span class="muted">{{ _('Pick dates to see availability') }}</span>{% endif %}</div>

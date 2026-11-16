@@ -9,7 +9,12 @@
 <div class="card row">
   <div class="avatar">{{ c.name[:1]|upper }}</div>
   <div class="grow"><strong>{{ c.name }}</strong><div class="muted">{{ c.phone }}{% if c.address %} · {{ c.address }}{% endif %}</div></div>
-  <a class="btn light sm" href="{{ url_for('booking_new', customer_id=c.id) }}">{{ _('Book') }}</a>
+  <div class="customer-actions">
+    <a class="btn light sm" href="{{ url_for('booking_new', customer_id=c.id) }}">{{ _('Book') }}</a>
+    <form method="post" action="{{ url_for('customer_delete', customer_id=c.id) }}" onsubmit="return confirm({{ _('Delete this customer?')|tojson|forceescape }})">
+      <button class="btn danger sm">{{ _('Delete') }}</button>
+    </form>
+  </div>
 </div>
 {% else %}{{ empty('🧑', _('No customers found')) }}{% endfor %}
 {% endblock %}

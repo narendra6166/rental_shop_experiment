@@ -24,9 +24,67 @@ class PhoneValidationTests(unittest.TestCase):
         self.client = self.app.test_client()
         with self.app.app_context():
             db = self.db.get_db()
+            db.execute("DELETE FROM bookings")
             db.execute("DELETE FROM customers")
             db.execute("DELETE FROM staff")
             db.commit()
+
+    def booking_data(self):
+        return {
+            "customer_name": "Customer", "phone": "0123456789", "address": "Shop road",
+            "event_type": "Birthday", "start_date": "2027-01-01", "end_date": "2027-01-01",
+            "qty_1": "1",
+        }
+
+    def test_booking_validates_phone_before_saving_customer(self):
+        for phone in ("666667778888888", "123", "123456789x", ""):
+            response = self.client.post("/bookings/new", data={**self.booking_data(), "phone": phone})
+            self.assertEqual(response.status_code, 200)
+        response = self.client.post("/bookings/new", data={**self.booking_data(), "qty_1": ""})
+        self.assertEqual(response.status_code, 200)
+        with self.app.app_context():
+            db = self.db.get_db()
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM customers").fetchone()[0], 0)
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM bookings").fetchone()[0], 0)
+
+    def test_inline_customer_reuse_and_edit_preserve_other_bookings(self):
+        first = self.client.post("/bookings/new", data=self.booking_data())
+        second = self.client.post("/bookings/new", data=self.booking_data())
+        self.assertEqual(first.status_code, 302)
+        self.assertEqual(second.status_code, 302)
+        with self.app.app_context():
+            self.assertEqual(self.db.get_db().execute("SELECT COUNT(*) FROM customers").fetchone()[0], 1)
+        edit_url = first.headers["Location"] + "/edit"
+        response = self.client.get(edit_url)
+        self.assertIn(b'value="Customer"', response.data)
+        response = self.client.get(edit_url, query_string=self.booking_data())
+        self.assertIn(b'value="0123456789"', response.data)
+        response = self.client.post(edit_url, data={**self.booking_data(), "customer_name": "Changed"})
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(b"Changed", self.client.get(first.headers["Location"]).data)
+        self.assertIn(b"Customer", self.client.get(second.headers["Location"]).data)
+        with self.app.app_context():
+            self.assertEqual(self.db.get_db().execute("SELECT COUNT(*) FROM customers").fetchone()[0], 2)
+
+    def test_customer_delete_protects_bookings_and_is_post_only(self):
+        self.client.post("/customers/new", data={"name": "Unused", "phone": "0123456789"})
+        with self.app.app_context():
+            customer_id = self.db.get_db().execute("SELECT id FROM customers").fetchone()[0]
+        url = f"/customers/{customer_id}/delete"
+        self.assertEqual(self.client.get(url).status_code, 405)
+        self.assertIn(b'value="Unused"', self.client.get(
+            "/bookings/new", query_string={"customer_id": customer_id}).data)
+        self.assertEqual(self.client.post(url).status_code, 302)
+        with self.app.app_context():
+            self.assertEqual(self.db.get_db().execute("SELECT COUNT(*) FROM customers").fetchone()[0], 0)
+        self.client.post("/bookings/new", data=self.booking_data())
+        with self.app.app_context():
+            customer_id = self.db.get_db().execute("SELECT id FROM customers").fetchone()[0]
+        response = self.client.post(f"/customers/{customer_id}/delete", follow_redirects=True)
+        self.assertIn(b"Customer has bookings and cannot be deleted.", response.data)
+        with self.app.app_context():
+            self.assertEqual(self.db.get_db().execute("SELECT COUNT(*) FROM customers").fetchone()[0], 1)
+            self.assertEqual(self.db.get_db().execute("SELECT COUNT(*) FROM bookings").fetchone()[0], 1)
 
     def test_customer_requires_exactly_ten_ascii_digits(self):
         for phone in ("", "123", "12345678901", "123456789a", "12345 6789", "１２３４５６７８９０"):

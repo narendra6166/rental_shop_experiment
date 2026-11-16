@@ -309,6 +309,22 @@ def customer_new():
     return render_template("customer_form.html", c={})
 
 
+@app.route("/customers/<int:customer_id>/delete", methods=["POST"])
+def customer_delete(customer_id):
+    db = get_db()
+    try:
+        cur = db.execute("DELETE FROM customers WHERE id = ?", (customer_id,))
+        db.commit()
+        if cur.rowcount:
+            flash(_("Customer deleted."), "ok")
+        else:
+            flash(_("Customer not found."), "error")
+    except sqlite3.IntegrityError:
+        db.rollback()
+        flash(_("Customer has bookings and cannot be deleted."), "error")
+    return redirect(url_for("customers"))
+
+
 # ---------- Bookings ----------
 @app.route("/bookings")
 def bookings():
@@ -355,17 +371,25 @@ def booking_new(booking_id=None):
         existing = db.execute("SELECT * FROM bookings WHERE id = ?", (booking_id,)).fetchone()
         if not existing:
             return redirect(url_for("bookings"))
-    custs = db.execute("SELECT * FROM customers ORDER BY name").fetchall()
     all_items = db.execute("SELECT * FROM items ORDER BY category, name").fetchall()
     if request.method == "POST":
         form = request.form
     elif existing and not request.args:
         form = {k: existing[k] for k in existing.keys()}
-        form["customer_id"] = existing["customer_id"]
+        customer = db.execute("SELECT * FROM customers WHERE id = ?",
+                              (existing["customer_id"],)).fetchone()
+        form.update(customer_name=customer["name"], phone=customer["phone"],
+                    address=customer["address"] or "")
         for l in db.execute("SELECT item_id, qty FROM booking_items WHERE booking_id = ?", (booking_id,)):
             form[f"qty_{l['item_id']}"] = l["qty"]
     else:
-        form = request.args
+        form = request.args.to_dict()
+        if form.get("customer_id") and "customer_name" not in form:
+            customer = db.execute("SELECT * FROM customers WHERE id = ?",
+                                  (form["customer_id"],)).fetchone()
+            if customer:
+                form.update(customer_name=customer["name"], phone=customer["phone"],
+                            address=customer["address"] or "")
 
     start_s, end_s = form.get("start_date", ""), form.get("end_date", "")
     start, end = parse_date(start_s), parse_date(end_s)
@@ -375,8 +399,13 @@ def booking_new(booking_id=None):
 
     if request.method == "POST":
         errors = []
-        if not form.get("customer_id", "").isdigit():
-            errors.append(_("Select a customer."))
+        name = form.get("customer_name", "").strip()
+        phone = form.get("phone", "").strip()
+        address = form.get("address", "").strip()
+        if not name or not phone:
+            errors.append(_("Name and phone are required."))
+        elif not valid_phone(phone):
+            errors.append(_("Phone number must contain exactly 10 digits."))
         if not (start and end) or end < start:
             errors.append(_("Enter valid start and end dates (end on/after start)."))
         discount = money_field(form, "discount", errors, "Discount")
@@ -402,7 +431,18 @@ def booking_new(booking_id=None):
             for e in errors:
                 flash(e, "error")
         else:
-            fields = (int(form["customer_id"]), form.get("event_type", "Other"), start_s, end_s,
+            customer = db.execute(
+                "SELECT id FROM customers WHERE name=? AND phone=? AND COALESCE(address, '')=? ORDER BY id LIMIT 1",
+                (name, phone, address),
+            ).fetchone()
+            if customer:
+                customer_id = customer["id"]
+            else:
+                customer_id = db.execute(
+                    "INSERT INTO customers (name, phone, address) VALUES (?,?,?)",
+                    (name, phone, address),
+                ).lastrowid
+            fields = (customer_id, form.get("event_type", "Other"), start_s, end_s,
                       discount, travel, labour, damage, form.get("notes", "").strip())
             if existing:
                 bid = booking_id
@@ -440,7 +480,7 @@ def booking_new(booking_id=None):
             flash(_("Booking updated.") if existing else _("Booking created."), "ok")
             return redirect(url_for("booking_view", booking_id=bid))
 
-    return render_template("booking_form.html", customers=custs, items=all_items, avail=avail,
+    return render_template("booking_form.html", items=all_items, avail=avail,
                            form=form, event_types=EVENT_TYPES, editing=existing)
 
 

@@ -5,6 +5,9 @@ Rental management for tents, cooking items, furniture, etc. (marriages, birthday
 Features: inventory, customers, bookings with date-based availability checks, advance/payments,
 refundable deposits, status tracking (Booked/Delivered/Returned/Cancelled), overdue alerts, printable invoices.
 Customer phone numbers must be exactly 10 digits; staff phone numbers are optional but follow the same rule when provided.
+Enter customer details directly when booking. Customers are saved only after the booking passes validation;
+identical name, phone and address details reuse a customer record. Editing details does not change other bookings.
+Customers without bookings can be deleted from the Customers page; customers with booking history are protected.
 
 ## Run
 
