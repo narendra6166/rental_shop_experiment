@@ -1,6 +1,7 @@
 import os
 import tempfile
 import unittest
+from unittest.mock import patch
 
 
 class PhoneValidationTests(unittest.TestCase):
@@ -35,6 +36,44 @@ class PhoneValidationTests(unittest.TestCase):
             "event_type": "Birthday", "start_date": "2027-01-01", "end_date": "2027-01-01",
             "qty_1": "1",
         }
+
+    def test_category_migration_preserves_stock_and_custom_categories(self):
+        import sqlite3
+
+        with tempfile.TemporaryDirectory() as folder:
+            path = os.path.join(folder, "migration.db")
+            with patch.object(self.db, "DB_PATH", path):
+                self.db.init_db()
+                with sqlite3.connect(path) as db:
+                    db.execute("UPDATE items SET category='Cooking' WHERE id=1")
+                    db.execute("UPDATE items SET category='Furniture' WHERE id=2")
+                    db.execute("UPDATE items SET category='Custom' WHERE id=3")
+                    before = db.execute("SELECT id, name, total_qty, rate_per_day, deposit FROM items").fetchall()
+                self.db.init_db()
+                self.db.init_db()
+                with sqlite3.connect(path) as db:
+                    self.assertEqual(before, db.execute(
+                        "SELECT id, name, total_qty, rate_per_day, deposit FROM items").fetchall())
+                    categories = dict(db.execute("SELECT id,category FROM items"))
+                    self.assertEqual(categories[1], "Cooking & Catering")
+                    self.assertEqual(categories[2], "Tents & Event Setup")
+                    self.assertEqual(categories[3], "Custom")
+
+    def test_item_categories_are_validated_and_grouped_on_all_pages(self):
+        data = {"name": "Homam equipment", "category": "Pooja & Rituals",
+                "total_qty": "0", "rate_per_day": "100", "deposit": "0"}
+        response = self.client.post("/items/new", data=data)
+        self.assertEqual(response.status_code, 302)
+        for path in ("/items", "/stock", "/bookings/new"):
+            response = self.client.get(path)
+            self.assertEqual(response.status_code, 200)
+            self.assertIn(b"Pooja &amp; Rituals</h2>", response.data)
+            self.assertIn(b"Cooking &amp; Catering</h2>", response.data)
+            self.assertIn(b"Tents &amp; Event Setup</h2>", response.data)
+        response = self.client.post("/items/new", data={**data, "category": "Unknown"})
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"Please enter valid item details.", response.data)
+        self.assertIn(b'value="Homam equipment"', response.data)
 
     def test_booking_validates_phone_before_saving_customer(self):
         for phone in ("666667778888888", "123", "123456789x", ""):

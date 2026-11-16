@@ -18,11 +18,12 @@
   <div class="stat"><b>{{ summary.damaged }}</b><span>{{ _('Damaged') }}</span></div>
 </div>
 {% for r in rows %}
+{% if loop.changed(r.i.category) %}<div class="section"><h2>{{ _(r.i.category) }}</h2></div>{% endif %}
 {% set total = r.i.total_qty %}
 {% set cls = 'zero' if r.free <= 0 else ('low' if r.free * 4 <= total else 'ok') %}
 <div class="card">
   <div class="row between">
-    <div class="grow"><strong>{{ r.i.name }}</strong><div class="muted">{{ r.i.category }} · {{ _('{n} total', n=total) }}</div></div>
+    <div class="grow"><strong>{{ r.i.name }}</strong><div class="muted">{{ _('{n} total', n=total) }}</div></div>
     <div class="num"><span class="avail {{ cls }}">{{ r.free }}</span><div class="muted">{{ _('free') }}</div></div>
   </div>
   <div class="bar"><i class="{{ cls if cls != 'ok' }}" style="width:{{ (100 * r.free / total) if total and r.free > 0 else 0 }}%"></i></div>

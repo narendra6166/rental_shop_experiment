@@ -8,6 +8,10 @@ Customer phone numbers must be exactly 10 digits; staff phone numbers are option
 Enter customer details directly when booking. Customers are saved only after the booking passes validation;
 identical name, phone and address details reuse a customer record. Editing details does not change other bookings.
 Customers without bookings can be deleted from the Customers page; customers with booking history are protected.
+Items are grouped on Inventory, Stock and Booking pages into Tents & Event Setup, Cooking & Catering,
+and Pooja & Rituals. Add your actual hot boxes, plates, vessels, mandapams and homam equipment with their stock counts.
+On startup, old Tents, Furniture, Decoration and Lighting categories move to Tents & Event Setup;
+Cooking moves to Cooking & Catering. Custom categories remain visible and can be reassigned by editing items.
 
 ## Run
 

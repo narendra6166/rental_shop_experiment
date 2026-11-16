@@ -100,15 +100,24 @@ CREATE TABLE IF NOT EXISTS salary_payments (
 );
 """
 
+ITEM_CATEGORIES = ["Tents & Event Setup", "Cooking & Catering", "Pooja & Rituals"]
+LEGACY_ITEM_CATEGORIES = {
+    "Tents": ITEM_CATEGORIES[0],
+    "Furniture": ITEM_CATEGORIES[0],
+    "Decoration": ITEM_CATEGORIES[0],
+    "Lighting": ITEM_CATEGORIES[0],
+    "Cooking": ITEM_CATEGORIES[1],
+}
+
 SAMPLE_ITEMS = [
-    ("Tent 10x10 ft", "Tents", 20, 500, 1000),
-    ("Shamiana (Large)", "Tents", 5, 3000, 5000),
-    ("Gas Stove (2 burner)", "Cooking", 10, 150, 500),
-    ("Big Cooking Vessel (Deg)", "Cooking", 15, 200, 500),
-    ("Gas Cylinder Stand + Burner", "Cooking", 8, 250, 800),
-    ("Plastic Chair", "Furniture", 300, 5, 0),
-    ("Round Table", "Furniture", 40, 60, 200),
-    ("Stage Decoration Set", "Decoration", 4, 2500, 3000),
+    ("Tent 10x10 ft", ITEM_CATEGORIES[0], 20, 500, 1000),
+    ("Shamiana (Large)", ITEM_CATEGORIES[0], 5, 3000, 5000),
+    ("Gas Stove (2 burner)", ITEM_CATEGORIES[1], 10, 150, 500),
+    ("Big Cooking Vessel (Deg)", ITEM_CATEGORIES[1], 15, 200, 500),
+    ("Gas Cylinder Stand + Burner", ITEM_CATEGORIES[1], 8, 250, 800),
+    ("Plastic Chair", ITEM_CATEGORIES[0], 300, 5, 0),
+    ("Round Table", ITEM_CATEGORIES[0], 40, 60, 200),
+    ("Stage Decoration Set", ITEM_CATEGORIES[0], 4, 2500, 3000),
 ]
 
 EVENT_TYPES = ["Marriage", "Birthday", "Engagement", "Housewarming", "Party", "Other"]
@@ -179,6 +188,8 @@ def init_db():
             "INSERT INTO items (name, category, total_qty, rate_per_day, deposit) VALUES (?,?,?,?,?)",
             SAMPLE_ITEMS,
         )
+    db.executemany("UPDATE items SET category=? WHERE category=?",
+                   [(new, old) for old, new in LEGACY_ITEM_CATEGORIES.items()])
     db.commit()
     db.close()
 

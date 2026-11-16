@@ -4,8 +4,16 @@
 {% block content %}
 <form method="post" class="card">
   <label style="margin-top:0">{{ _('Name') }}</label><input name="name" required value="{{ item.name if item else '' }}">
-  <label>{{ _('Category') }}</label><input name="category" required list="cats" value="{{ item.category if item else '' }}">
-  <datalist id="cats"><option>Tents</option><option>Cooking</option><option>Furniture</option><option>Decoration</option><option>Lighting</option></datalist>
+  <label for="category">{{ _('Category') }}</label>
+  <select id="category" name="category" required>
+    <option value="">{{ _('Select category') }}</option>
+    {% for category in item_categories %}
+    <option value="{{ category }}" {{ 'selected' if item and item.category == category }}>{{ _(category) }}</option>
+    {% endfor %}
+    {% if item and item.category and item.category not in item_categories %}
+    <option value="{{ item.category }}" selected>{{ item.category }}</option>
+    {% endif %}
+  </select>
   <label>{{ _('Total quantity') }}</label><input type="number" inputmode="numeric" min="0" name="total_qty" required value="{{ item.total_qty if item else '' }}">
   <div class="grid2">
     <div><label>{{ _('Rate / day (₹)') }}</label><input type="number" inputmode="decimal" min="0" step="0.01" name="rate_per_day" required value="{{ item.rate_per_day if item else '' }}"></div>

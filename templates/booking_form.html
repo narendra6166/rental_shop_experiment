@@ -20,8 +20,10 @@
   </div>
 
   <div class="section"><h2>{{ _('Items') }}</h2>{% if not avail %}<span class="muted">{{ _('Pick dates to see availability') }}</span>{% endif %}</div>
+  {% for category, category_items in items|groupby('category') %}
+  <div class="section"><h2>{{ _(category) }}</h2></div>
   <div class="card">
-    {% for i in items %}
+    {% for i in category_items %}
     <div class="item">
       <div class="grow"><strong>{{ i.name }}</strong>
         <div class="muted">{{ i.rate_per_day|money }}{{ _('/day') }}{% if avail %} · <b style="color:{{ 'var(--red)' if avail[i.id] <= 0 else 'var(--green)' }}">{{ _('{n} free', n=avail[i.id]) }}</b>{% endif %}</div></div>
@@ -29,6 +31,7 @@
     </div>
     {% endfor %}
   </div>
+  {% endfor %}
 
   <div class="card">
     <div class="grid2">

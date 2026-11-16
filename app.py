@@ -28,6 +28,7 @@ app.teardown_appcontext(core.close_db)
 app.register_blueprint(staff_bp)
 app.register_blueprint(stock_bp)
 app.jinja_env.globals.update(salary_types=core.SALARY_TYPES, id_types=core.ID_TYPES,
+                           item_categories=core.ITEM_CATEGORIES,
                            status_info=status_info, shop_name=SHOP_NAME, shop_address=SHOP_ADDRESS,
                            shop_phone=SHOP_PHONE, today=date.today,
                            timedelta=timedelta, _=_, get_lang=get_lang, langs=LANGS)
@@ -236,6 +237,8 @@ def item_form(item_id=None):
                 float(request.form.get("deposit") or 0),
             )
             if not data[0] or not data[1] or min(data[2:]) < 0:
+                raise ValueError
+            if data[1] not in core.ITEM_CATEGORIES and not (item and data[1] == item["category"]):
                 raise ValueError
         except (KeyError, ValueError):
             flash(_("Please enter valid item details."), "error")

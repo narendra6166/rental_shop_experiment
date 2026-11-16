@@ -4,8 +4,9 @@
 {% block fab %}<a class="fab noprint" href="{{ url_for('item_form') }}">＋ {{ _('Item') }}</a>{% endblock %}
 {% block content %}
 {% for i in items %}
+{% if loop.changed(i.category) %}<div class="section"><h2>{{ _(i.category) }}</h2></div>{% endif %}
 <div class="card">
-  <div class="row between"><strong>{{ i.name }}</strong><span class="pill purple">{{ i.category }}</span></div>
+  <div class="row between"><strong>{{ i.name }}</strong></div>
   <div class="muted mt">{{ _('{n} in stock', n=i.total_qty) }} · {{ i.rate_per_day|money }}{{ _('/day') }} · {{ _('deposit') }} {{ i.deposit|money }}</div>
   <div class="row mt">
     <a class="btn light sm" href="{{ url_for('item_form', item_id=i.id) }}">{{ _('Edit') }}</a>
