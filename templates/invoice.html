@@ -12,7 +12,7 @@
       <strong>{{ _('Rental bill #{n}', n=b.id) }}</strong>
       <div class="muted">{{ _('Not a GST tax invoice') }}</div>
       <div class="muted">{{ _('Generated on') }}: {{ today()|ldate('%d %b %Y') }}</div>
-      <div class="muted">{{ _('Booked on') }}: {{ b.created_at[:10] }}</div>
+      <div class="muted">{{ _('Booked on') }}: {{ b.created_at[:10]|dmy('%d %b %Y') }}</div>
     </div>
   </div>
 
@@ -25,7 +25,7 @@
     <div>
       <h3>{{ _('Event details') }}</h3>
       {{ _(b.event_type) }}<br>
-      {{ b.start_date }} {{ _('to') }} {{ b.end_date }}<br>
+      {{ _('{a} to {b}', a=b.start_date|dmy('%d %b %Y'), b=b.end_date|dmy('%d %b %Y')) }}<br>
       {{ _('{n} days' if t.days > 1 else '{n} day', n=t.days) }}
     </div>
   </div>
@@ -35,7 +35,7 @@
     <table class="lines">
       <thead><tr><th>{{ _('Item') }}</th><th class="num">{{ _('Qty') }}</th><th class="num">{{ _('Rate / day') }}</th><th class="num">{{ _('Days') }}</th><th class="num">{{ _('Amount') }}</th></tr></thead>
       <tbody>{% for l in t.lines %}
-      <tr><td>{{ l.name }}</td><td class="num">{{ l.qty }}</td><td class="num">{{ l.rate|money }}</td><td class="num">{{ t.days }}</td><td class="num">{{ (l.qty * l.rate * t.days)|money }}</td></tr>
+      <tr><td>{{ _(l.name) }}</td><td class="num">{{ l.qty }}</td><td class="num">{{ l.rate|money }}</td><td class="num">{{ t.days }}</td><td class="num">{{ (l.qty * l.rate * t.days)|money }}</td></tr>
       {% endfor %}</tbody>
     </table>
   </div>
@@ -65,7 +65,7 @@
   <table class="lines">
     <thead><tr><th>{{ _('Date') }}</th><th>{{ _('Type') }}</th><th class="num">{{ _('Amount') }}</th></tr></thead>
     <tbody>{% for p in t.payments %}
-    <tr><td>{{ p.paid_on }}</td><td>{{ _(p.kind) }}</td><td class="num">{{ p.amount|money }}</td></tr>
+    <tr><td>{{ p.paid_on|dmy('%d %b %Y') }}</td><td>{{ _(p.kind) }}</td><td class="num">{{ p.amount|money }}</td></tr>
     {% else %}<tr><td colspan="3">{{ _('No payments yet') }}</td></tr>{% endfor %}</tbody>
   </table>
   <p class="muted">{{ _('Deposit is refundable on return of items in good condition. Damaged or lost items will be charged.') }}</p>

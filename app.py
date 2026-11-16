@@ -52,9 +52,9 @@ def money(v):
 
 
 @app.template_filter("dmy")
-def dmy(v):
+def dmy(v, pattern="%d %b"):
     d = parse_date(v)
-    return fmt_date(d, "%d %b") if d else v
+    return fmt_date(d, pattern) if d else v
 
 
 @app.template_filter("ldate")

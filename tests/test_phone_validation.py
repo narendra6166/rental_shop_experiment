@@ -86,6 +86,34 @@ class PhoneValidationTests(unittest.TestCase):
             self.assertEqual(db.execute("SELECT COUNT(*) FROM customers").fetchone()[0], 0)
             self.assertEqual(db.execute("SELECT COUNT(*) FROM bookings").fetchone()[0], 0)
 
+    def test_invoice_uses_selected_language_and_preserves_entered_details(self):
+        response = self.client.post("/bookings/new", data=self.booking_data())
+        booking_id = int(response.headers["Location"].rsplit("/", 1)[-1])
+        from i18n import _
+
+        with self.app.app_context():
+            db = self.db.get_db()
+            db.execute("INSERT INTO payments (booking_id, amount, kind, paid_on) VALUES (?, 30, 'Advance', '2027-01-01')", (booking_id,))
+            db.commit()
+        for lang, month in (("en", "Jan"), ("te", "జన"), ("hi", "जन")):
+            self.client.set_cookie("lang", lang)
+            for status in ("Booked", "Returned", "Cancelled"):
+                with self.subTest(lang=lang, status=status):
+                    with self.app.app_context():
+                        db = self.db.get_db()
+                        db.execute("UPDATE bookings SET status=? WHERE id=?", (status, booking_id))
+                        db.commit()
+                    bill = self.client.get(f"/bookings/{booking_id}/invoice").get_data(as_text=True)
+                    self.assertIn(f'<html lang="{lang}">', bill)
+                    self.assertIn(f"01 {month} 2027", bill)
+                    self.assertIn("Customer", bill)
+                    self.assertIn("Shop road", bill)
+                    with self.app.test_request_context(headers={"Cookie": f"lang={lang}"}):
+                        from markupsafe import escape
+                        for label in ("Not a GST tax invoice", "Payment history", "Advance",
+                                      "Print / Save PDF", "Tent 10x10 ft"):
+                            self.assertIn(str(escape(_(label))), bill)
+
     def test_rental_bill_shows_consistent_totals_and_payment_history(self):
         response = self.client.post("/bookings/new", data=self.booking_data())
         booking_id = int(response.headers["Location"].rsplit("/", 1)[-1])
@@ -102,7 +130,7 @@ class PhoneValidationTests(unittest.TestCase):
         self.assertIn("<td>Refundable deposit</td><td class=\"num\">₹50</td>", bill)
         self.assertIn("<td>Total due before payments</td><td class=\"num\">₹50</td>", bill)
         self.assertIn("<td>Balance due</td><td class=\"num\">₹20</td>", bill)
-        self.assertIn("<td>2027-01-01</td><td>Advance</td><td class=\"num\">₹30</td>", bill)
+        self.assertIn("<td>01 Jan 2027</td><td>Advance</td><td class=\"num\">₹30</td>", bill)
         with self.app.app_context():
             db = self.db.get_db()
             db.execute("UPDATE bookings SET status='Returned' WHERE id=?", (booking_id,))
