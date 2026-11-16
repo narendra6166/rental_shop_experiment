@@ -233,6 +233,12 @@ def item_form(item_id=None):
             flash(_("Please enter valid item details."), "error")
             return render_template("item_form.html", item=request.form, item_id=item_id)
         if item_id:
+            out_now = db.execute(
+                """SELECT COALESCE(SUM(bi.qty), 0) FROM booking_items bi JOIN bookings b ON b.id = bi.booking_id
+                   WHERE bi.item_id = ? AND b.status IN ('Delivered', 'WorkDone')""", (item_id,)).fetchone()[0]
+            if data[2] < out_now:
+                flash(_("{n} units are out on rent, total cannot be less than that.", n=out_now), "error")
+                return render_template("item_form.html", item=request.form, item_id=item_id)
             db.execute(
                 "UPDATE items SET name=?, category=?, total_qty=?, rate_per_day=?, deposit=? WHERE id=?",
                 data + (item_id,),
@@ -376,7 +382,7 @@ def booking_new(booking_id=None):
                     chosen.append((i, int(raw)))
         if not chosen:
             errors.append(_("Select at least one item."))
-        if avail:
+        if avail and not (existing and existing["status"] in ("Returned", "Cancelled")):
             for i, q in chosen:
                 if q > avail[i["id"]]:
                     errors.append(_("Only {n} of {name} available for those dates.",
@@ -491,6 +497,9 @@ def booking_payment(booking_id):
 @app.route("/bookings/<int:booking_id>/delete", methods=["POST"])
 def booking_delete(booking_id):
     db = get_db()
+    if db.execute("SELECT 1 FROM payments WHERE booking_id = ?", (booking_id,)).fetchone():
+        flash(_("This booking has payments, so it cannot be deleted. Cancel it instead."), "error")
+        return redirect(url_for("booking_view", booking_id=booking_id))
     db.execute("DELETE FROM bookings WHERE id = ?", (booking_id,))
     db.commit()
     flash(_("Booking deleted."), "ok")
