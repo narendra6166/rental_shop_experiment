@@ -15,7 +15,7 @@
     {% if p.today %}<span class="pill {{ {'Present': 'green', 'Half': 'orange', 'Absent': 'red', 'Leave': 'purple'}[p.today] }}">{{ _(p.today) }}</span>
     {% else %}<span class="pill grey">{{ _('Not marked') }}</span>{% endif %}
   </div>
-  <div class="row between mt muted"><span>{{ _('Salary {amt}', amt=p.s.monthly_salary|money) }}</span><span>{{ _('This month due:') }} <b style="color:var(--ink)">{{ p.sum.due|money }}</b></span></div>
+  <div class="row between mt muted"><span>{{ _('{amt}/day', amt=p.s.monthly_salary|money) if p.s.salary_type == 'Daily' else _('{amt}/month', amt=p.s.monthly_salary|money) }}</span><span>{{ _('This month due:') }} <b style="color:var(--ink)">{{ p.sum.due|money }}</b></span></div>
 </a>
 {% else %}{{ empty('👷', _('No staff yet. Tap ＋ Staff to add.')) }}{% endfor %}
 {% endblock %}

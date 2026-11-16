@@ -31,7 +31,20 @@ def stock():
         free = i["total_qty"] - damaged - reserved
         rows.append({"i": i, "reserved": reserved, "damaged": damaged, "out_now": out_now,
                      "free": free})
-    return render_template("stock.html", rows=rows, start=start_s, end=end_s)
+    pending = db.execute(
+        """SELECT b.id, b.end_date, b.start_date, c.name AS customer, c.phone,
+                  GROUP_CONCAT(i.name || ' × ' || bi.qty, ', ') AS items, SUM(bi.qty) AS qty
+           FROM bookings b JOIN customers c ON c.id = b.customer_id
+           JOIN booking_items bi ON bi.booking_id = b.id JOIN items i ON i.id = bi.item_id
+           WHERE b.status = 'Delivered' GROUP BY b.id ORDER BY b.end_date""").fetchall()
+    summary = {
+        "total": sum(r["i"]["total_qty"] for r in rows),
+        "on_rent": sum(r["out_now"] for r in rows),
+        "damaged": sum(r["damaged"] for r in rows),
+        "free": sum(max(r["free"], 0) for r in rows),
+    }
+    return render_template("stock.html", rows=rows, start=start_s, end=end_s,
+                           pending=pending, summary=summary, today=today)
 
 
 @stock_bp.route("/damages")

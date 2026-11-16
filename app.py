@@ -8,19 +8,26 @@ from flask import (Flask, flash, make_response, redirect, render_template, reque
 
 import db as core
 from i18n import LANGS, _, fmt_date, get_lang
-from db import (EVENT_TYPES, PAYMENT_KINDS, STATUS_TABS, STATUSES, available_qty,
-                booking_totals, get_db, parse_date, status_info)
+from db import (EVENT_TYPES, EXPENSE_CATEGORIES, PAYMENT_KINDS, STATUS_TABS, STATUSES,
+                STOCK_PURCHASE, available_qty, booking_totals, get_db, month_finance, parse_date,
+                parse_month, shift_month, status_info)
 from staff import staff_bp
 from stock import stock_bp
 
-SHOP_NAME = os.environ.get("SHOP_NAME", "Event Hire Shop")
+SHOP_NAME = os.environ.get("SHOP_NAME", "Ganesh Hyres")
+SHOP_ADDRESS = os.environ.get(
+    "SHOP_ADDRESS",
+    "Near Sri Potti Sreeramulu Bomma, Chennur Road, Buchireddypalem, Nellore, Andhra Pradesh")
+SHOP_PHONE = os.environ.get("SHOP_PHONE", "")
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "change-me-in-production")
 app.teardown_appcontext(core.close_db)
 app.register_blueprint(staff_bp)
 app.register_blueprint(stock_bp)
-app.jinja_env.globals.update(status_info=status_info, shop_name=SHOP_NAME, today=date.today,
+app.jinja_env.globals.update(salary_types=core.SALARY_TYPES, id_types=core.ID_TYPES,
+                           status_info=status_info, shop_name=SHOP_NAME, shop_address=SHOP_ADDRESS,
+                           shop_phone=SHOP_PHONE, today=date.today,
                            timedelta=timedelta, _=_, get_lang=get_lang, langs=LANGS)
 
 
@@ -72,16 +79,18 @@ def dashboard():
     needs_action = by_key.get("pending", []) + by_key.get("today", []) + by_key.get("overdue", [])
     soon = by_key.get("soon", [])
     on_work = by_key.get("onwork", [])
-    balance_due = sum(max(booking_totals(db, b["id"])["balance"], 0) for b in active)
+    totals = [(b, booking_totals(db, b["id"])) for b in booking_rows() if b["status"] != "Cancelled"]
+    balance_due = sum(max(t["balance"], 0) for b, t in totals)
+    refunds_due = sum(-t["balance"] for b, t in totals if b["status"] == "Returned" and t["balance"] < 0)
+    fin = month_finance(db, month)
     stats = {
         "soon": len(soon) + len(by_key.get("today", [])) + len(by_key.get("pending", [])),
         "on_work": len(on_work) + len(by_key.get("overdue", [])),
         "balance": balance_due,
-        "collected": db.execute(
-            """SELECT COALESCE(SUM(CASE WHEN kind='Deposit refund' THEN -amount ELSE amount END), 0)
-               FROM payments WHERE substr(paid_on,1,7) = ?""",
-            (month,),
-        ).fetchone()[0],
+        "refunds_due": refunds_due,
+        "collected": fin["received"],
+        "spent": fin["expenses"],
+        "net_cash": fin["net_cash"],
         "open_damages": db.execute(
             "SELECT COALESCE(SUM(qty),0) FROM damages WHERE status='Open'"
         ).fetchone()[0],
@@ -99,6 +108,79 @@ def dashboard():
 @app.route("/more")
 def more():
     return render_template("more.html")
+
+
+@app.route("/finance")
+def finance():
+    db = get_db()
+    month = parse_month(request.args.get("month"))
+    totals = [(b, booking_totals(db, b["id"])) for b in booking_rows() if b["status"] != "Cancelled"]
+    by_category = db.execute(
+        "SELECT category, SUM(amount) AS total FROM expenses WHERE paid_on LIKE ? "
+        "GROUP BY category ORDER BY total DESC", (month + "%",)).fetchall()
+    return render_template(
+        "finance.html", month=month, f=month_finance(db, month), by_category=by_category,
+        prev_month=shift_month(month, -1), next_month=shift_month(month, 1),
+        to_collect=sum(max(t["balance"], 0) for b, t in totals),
+        to_refund=sum(-t["balance"] for b, t in totals if b["status"] == "Returned" and t["balance"] < 0),
+    )
+
+
+@app.route("/expenses")
+def expenses():
+    db = get_db()
+    month = parse_month(request.args.get("month"))
+    rows = db.execute(
+        """SELECT e.*, i.name AS item FROM expenses e LEFT JOIN items i ON i.id = e.item_id
+           WHERE e.paid_on LIKE ? ORDER BY e.paid_on DESC, e.id DESC""", (month + "%",)).fetchall()
+    return render_template("expenses.html", rows=rows, month=month, total=sum(r["amount"] for r in rows),
+                           prev_month=shift_month(month, -1), next_month=shift_month(month, 1))
+
+
+@app.route("/expenses/new", methods=["GET", "POST"])
+def expense_new():
+    db = get_db()
+    items = db.execute("SELECT * FROM items ORDER BY name").fetchall()
+    form = request.form if request.method == "POST" else request.args
+    if request.method == "POST":
+        category = form.get("category")
+        item_id = int(form["item_id"]) if form.get("item_id", "").isdigit() else None
+        qty = int(form["qty"]) if form.get("qty", "").isdigit() else 0
+        paid_on = (parse_date(form.get("paid_on")) or date.today()).isoformat()
+        try:
+            amount = float(form.get("amount", ""))
+        except ValueError:
+            amount = 0
+        stock_buy = category == STOCK_PURCHASE
+        if category not in EXPENSE_CATEGORIES or amount <= 0 or (stock_buy and (not item_id or qty <= 0)):
+            flash(_("Enter a valid amount and category (and item and quantity for stock purchases)."), "error")
+        else:
+            db.execute(
+                "INSERT INTO expenses (category, amount, paid_on, note, item_id, qty) VALUES (?,?,?,?,?,?)",
+                (category, amount, paid_on, form.get("note", "").strip(),
+                 item_id if stock_buy else None, qty if stock_buy else None),
+            )
+            if stock_buy:
+                db.execute("UPDATE items SET total_qty = total_qty + ? WHERE id = ?", (qty, item_id))
+            db.commit()
+            flash(_("Expense saved."), "ok")
+            return redirect(url_for("expenses", month=paid_on[:7]))
+    return render_template("expense_form.html", items=items, form=form, categories=EXPENSE_CATEGORIES,
+                           stock_purchase=STOCK_PURCHASE)
+
+
+@app.route("/expenses/<int:expense_id>/delete", methods=["POST"])
+def expense_delete(expense_id):
+    db = get_db()
+    e = db.execute("SELECT * FROM expenses WHERE id = ?", (expense_id,)).fetchone()
+    if e:
+        if e["item_id"] and e["qty"]:
+            db.execute("UPDATE items SET total_qty = MAX(total_qty - ?, 0) WHERE id = ?",
+                       (e["qty"], e["item_id"]))
+        db.execute("DELETE FROM expenses WHERE id = ?", (expense_id,))
+        db.commit()
+        flash(_("Expense deleted."), "ok")
+    return redirect(url_for("expenses", month=e["paid_on"][:7] if e else None))
 
 
 @app.route("/backup")

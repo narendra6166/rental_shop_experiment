@@ -37,6 +37,9 @@
   <div class="stat hl"><b>{{ stats.on_work }}</b><span>{{ _('On work now') }}</span></div>
   <div class="stat"><b>{{ stats.balance|money }}</b><span>{{ _('Balance to collect') }}</span></div>
   <div class="stat"><b>{{ stats.collected|money }}</b><span>{{ _('Collected this month') }}</span></div>
+  <div class="stat"><b>{{ stats.spent|money }}</b><span>{{ _('Spent this month') }}</span></div>
+  <div class="stat"><b>{{ stats.net_cash|money }}</b><span>{{ _('Net cash this month') }}</span></div>
+  {% if stats.refunds_due %}<div class="stat"><b>{{ stats.refunds_due|money }}</b><span>{{ _('Deposits to refund') }}</span></div>{% endif %}
   <div class="stat"><b>{{ stats.soon }}</b><span>{{ _('Starting soon') }}</span></div>
 </div>
 

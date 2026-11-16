@@ -48,12 +48,12 @@
   <table class="lines">
     <tr><td>{{ _('Rent') }}</td><td class="num">{{ t.rent|money }}</td></tr>
     {% if t.discount %}<tr><td>{{ _('Discount') }}</td><td class="num">-{{ t.discount|money }}</td></tr>{% endif %}
-    <tr><td>{{ _('Refundable deposit') }}</td><td class="num">{{ t.deposit|money }}</td></tr>
+    <tr><td>{{ _('Refundable deposit') }}{% if t.deposit_returned %} ({{ _('returned separately') }}){% endif %}</td><td class="num">{{ t.deposit|money }}</td></tr>
     {% if t.damage %}<tr><td>{{ _('Damage charges') }}</td><td class="num">{{ t.damage|money }}</td></tr>{% endif %}
     <tr class="total"><td>{{ _('Total') }}</td><td class="num">{{ t.total|money }}</td></tr>
     <tr><td>{{ _('Paid') }}</td><td class="num">{{ t.paid|money }}</td></tr>
-    {% if t.refunded %}<tr><td>{{ _('Deposit refunded') }}</td><td class="num">{{ t.refunded|money }}</td></tr>{% endif %}
-    <tr class="total"><td>{{ _('Balance') }}</td><td class="num" style="color:{{ 'var(--red)' if t.balance > 0 else 'var(--green)' }}">{{ t.balance|money }}</td></tr>
+    {% if t.refunded %}<tr><td>{{ _('Deposit refunded') }}</td><td class="num">-{{ t.refunded|money }}</td></tr>{% endif %}
+    <tr class="total"><td>{{ _('Deposit to refund') if t.balance < 0 else _('Balance due') }}</td><td class="num" style="color:{{ 'var(--red)' if t.balance > 0 else 'var(--green)' }}">{{ t.balance|abs|money }}</td></tr>
   </table>
 </div>
 

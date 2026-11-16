@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}{{ _('Add expense') }}{% endblock %}
+{% block fab %}{% endblock %}
+{% block content %}
+<form method="post" class="card">
+  <label style="margin-top:0">{{ _('Category') }}</label>
+  <select name="category" id="cat" onchange="document.getElementById('buy').style.display = this.value === {{ stock_purchase|tojson|forceescape }} ? 'block' : 'none'">
+    {% for c in categories %}<option value="{{ c }}" {{ 'selected' if form.get('category') == c }}>{{ _(c) }}</option>{% endfor %}
+  </select>
+  <div id="buy" style="display:{{ 'block' if form.get('category') == stock_purchase else 'none' }}">
+    <label>{{ _('Item purchased') }}</label>
+    <select name="item_id"><option value="">—</option>
+      {% for i in items %}<option value="{{ i.id }}" {{ 'selected' if form.get('item_id')|string == i.id|string }}>{{ i.name }}</option>{% endfor %}
+    </select>
+    <label>{{ _('Quantity added to stock') }}</label>
+    <input type="number" inputmode="numeric" min="1" step="1" name="qty" value="{{ form.get('qty', '') }}">
+  </div>
+  <div class="grid2">
+    <div><label>{{ _('Amount (₹)') }}</label><input type="number" inputmode="decimal" min="1" step="any" name="amount" required value="{{ form.get('amount', '') }}"></div>
+    <div><label>{{ _('Date') }}</label><input type="date" name="paid_on" value="{{ form.get('paid_on') or today().isoformat() }}"></div>
+  </div>
+  <label>{{ _('Note (optional)') }}</label><input name="note" value="{{ form.get('note', '') }}">
+  <button class="btn block mt">{{ _('Save') }}</button>
+</form>
+{% endblock %}

@@ -1,8 +1,10 @@
+import re
 from datetime import date
 
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 
-from db import SALARY_KINDS, ATTENDANCE, get_db, parse_date, parse_month, salary_summary, shift_month
+from db import (ID_TYPES, SALARY_KINDS, SALARY_TYPES, ATTENDANCE, get_db, parse_date, parse_month,
+                salary_summary, shift_month)
 from i18n import _
 
 staff_bp = Blueprint("staff", __name__)
@@ -46,16 +48,33 @@ def staff_form(staff_id=None):
             return render_template("staff_form.html", p=request.form, staff_id=staff_id)
         join = request.form.get("join_date") or date.today().isoformat()
         active = 1 if request.form.get("active", "1") == "1" else 0
+        salary_type = request.form.get("salary_type")
+        id_type = request.form.get("id_type", "")
+        id_number = re.sub(r"\s+", "", request.form.get("id_number", "")).upper()
+        if salary_type not in SALARY_TYPES:
+            salary_type = "Monthly"
+        if id_type not in ID_TYPES:
+            id_type = ""
+        if id_type and not id_number:
+            flash(_("Enter the ID number."), "error")
+            return render_template("staff_form.html", p=request.form, staff_id=staff_id)
+        if (id_type == "Aadhaar" and not re.fullmatch(r"\d{12}", id_number)) or (
+                id_type == "PAN" and not re.fullmatch(r"[A-Z]{5}\d{4}[A-Z]", id_number)):
+            flash(_("Invalid ID number. Aadhaar has 12 digits; PAN looks like ABCDE1234F."), "error")
+            return render_template("staff_form.html", p=request.form, staff_id=staff_id)
         db = get_db()
-        data = (name, request.form.get("phone", "").strip(), role, salary, join, active)
+        data = (name, request.form.get("phone", "").strip(), role, salary, join, active,
+                salary_type, request.form.get("address", "").strip(), id_type, id_number)
         if staff_id:
             db.execute(
-                "UPDATE staff SET name=?, phone=?, role=?, monthly_salary=?, join_date=?, active=? WHERE id=?",
+                "UPDATE staff SET name=?, phone=?, role=?, monthly_salary=?, join_date=?, active=?, "
+                "salary_type=?, address=?, id_type=?, id_number=? WHERE id=?",
                 data + (staff_id,),
             )
         else:
             db.execute(
-                "INSERT INTO staff (name, phone, role, monthly_salary, join_date, active) VALUES (?,?,?,?,?,?)",
+                "INSERT INTO staff (name, phone, role, monthly_salary, join_date, active, "
+                "salary_type, address, id_type, id_number) VALUES (?,?,?,?,?,?,?,?,?,?)",
                 data,
             )
         db.commit()
