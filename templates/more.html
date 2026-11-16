@@ -1,6 +1,8 @@
 {% extends "base.html" %}
-{% block back %}{% endblock %}
-{% block title %}{{ _('More') }}{% endblock %}
+{% block back %}{% if login_enabled %}<a class="card row" href="{{ url_for('logout') }}"><span style="font-size:1.6rem">🔒</span><div class="grow"><strong>{{ _('Log out') }}</strong></div>›</a>{% endif %}
+{% endblock %}
+{% block title %}{{ _('More') }}{% if login_enabled %}<a class="card row" href="{{ url_for('logout') }}"><span style="font-size:1.6rem">🔒</span><div class="grow"><strong>{{ _('Log out') }}</strong></div>›</a>{% endif %}
+{% endblock %}
 {% block content %}
 <div class="card" id="lang">
   <strong>🌐 {{ _('Language') }}</strong>
@@ -18,4 +20,5 @@
 <a class="card row" href="{{ url_for('expenses') }}"><span style="font-size:1.6rem">🧾</span><div class="grow"><strong>{{ _('Expenses') }}</strong><div class="muted">{{ _('Shop rent, new stock purchases, other costs') }}</div></div>›</a>
 <a class="card row" href="{{ url_for('finance') }}"><span style="font-size:1.6rem">📊</span><div class="grow"><strong>{{ _('Finance report') }}</strong><div class="muted">{{ _('Income, expenses and profit by month') }}</div></div>›</a>
 <a class="card row" href="{{ url_for('backup') }}"><span style="font-size:1.6rem">💾</span><div class="grow"><strong>{{ _('Download backup') }}</strong><div class="muted">{{ _('Save all your data as a file') }}</div></div>›</a>
+{% if login_enabled %}<a class="card row" href="{{ url_for('logout') }}"><span style="font-size:1.6rem">🔒</span><div class="grow"><strong>{{ _('Log out') }}</strong></div>›</a>{% endif %}
 {% endblock %}

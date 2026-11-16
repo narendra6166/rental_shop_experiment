@@ -16,15 +16,17 @@
     {% for l in t.lines %}
     <tr><td>{{ l.name }}</td><td class="num">{{ l.qty }}</td><td class="num">{{ l.rate|money }}</td><td class="num">{{ (l.qty * l.rate * t.days)|money }}</td></tr>
     {% endfor %}
+    {% if t.cancelled %}<tr><td colspan="3">{{ _('Cancellation fee') }}</td><td class="num">{{ t.cancel_fee|money }}</td></tr>{% else %}
     <tr><td colspan="3">{{ _('Rent') }}</td><td class="num">{{ t.rent|money }}</td></tr>
     {% if t.discount %}<tr><td colspan="3">{{ _('Discount') }}</td><td class="num">-{{ t.discount|money }}</td></tr>{% endif %}
     <tr><td colspan="3">{{ _('Refundable deposit') }}{% if t.deposit_returned %} ({{ _('returned separately') }}){% endif %}</td><td class="num">{{ t.deposit|money }}</td></tr>
     {% if t.travel %}<tr><td colspan="3">{{ _('Travel charges') }}</td><td class="num">{{ t.travel|money }}</td></tr>{% endif %}
     {% if t.labour %}<tr><td colspan="3">{{ _('Labour charges') }}</td><td class="num">{{ t.labour|money }}</td></tr>{% endif %}
     {% if t.damage %}<tr><td colspan="3">{{ _('Damage charges') }}</td><td class="num">{{ t.damage|money }}</td></tr>{% endif %}
+    {% endif %}
     <tr class="total"><td colspan="3">{{ _('Total') }}</td><td class="num">{{ t.total|money }}</td></tr>
     <tr><td colspan="3">{{ _('Paid') }}</td><td class="num">{{ t.paid|money }}</td></tr>
-    {% if t.refunded %}<tr><td colspan="3">{{ _('Deposit refunded') }}</td><td class="num">-{{ t.refunded|money }}</td></tr>{% endif %}
+    {% if t.refunded %}<tr><td colspan="3">{{ _('Refunded') }}</td><td class="num">-{{ t.refunded|money }}</td></tr>{% endif %}
     <tr class="total"><td colspan="3">{{ _('Deposit to refund') if t.balance < 0 else _('Balance due') }}</td><td class="num">{{ t.balance|abs|money }}</td></tr>
   </table>
   <p class="muted">{{ _('Deposit is refundable on return of items in good condition. Damaged or lost items will be charged.') }}</p>

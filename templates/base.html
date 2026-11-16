@@ -26,12 +26,12 @@
   {% block content %}{% endblock %}
 </main>
 {% block fab %}<a class="fab noprint" href="{{ url_for('booking_new') }}">＋ {{ _('Booking') }}</a>{% endblock %}
-<nav class="tabbar noprint">
+{% block nav %}<nav class="tabbar noprint">
   <a href="{{ url_for('dashboard') }}" class="{{ 'on' if ep == 'dashboard' }}"><span>🏠</span>{{ _('Home') }}</a>
   <a href="{{ url_for('bookings') }}" class="{{ 'on' if ep.startswith('booking') or ep == 'invoice' }}"><span>📋</span>{{ _('Bookings') }}</a>
   <a href="{{ url_for('stock.stock') }}" class="{{ 'on' if ep.startswith('stock.') }}"><span>📦</span>{{ _('Stock') }}</a>
   <a href="{{ url_for('staff.staff_list') }}" class="{{ 'on' if ep.startswith('staff.') or ep == 'staff.attendance' }}"><span>👥</span>{{ _('Staff') }}</a>
   <a href="{{ url_for('more') }}" class="{{ 'on' if ep in ('more', 'items', 'item_form', 'customers', 'customer_new') }}"><span>☰</span>{{ _('More') }}</a>
-</nav>
+</nav>{% endblock %}
 </body>
 </html>

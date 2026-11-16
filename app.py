@@ -1,10 +1,11 @@
+import hmac
 import os
 import sqlite3
 import tempfile
 from datetime import date, datetime, timedelta
 
 from flask import (Flask, flash, make_response, redirect, render_template, request, send_file,
-                   url_for)
+                   session, url_for)
 
 import db as core
 from i18n import LANGS, _, fmt_date, get_lang
@@ -88,9 +89,10 @@ def dashboard():
                     + by_key.get("payment", []))
     soon = by_key.get("soon", [])
     on_work = by_key.get("onwork", []) + by_key.get("workdone", [])
-    totals = [(b, booking_totals(db, b["id"])) for b in booking_rows() if b["status"] != "Cancelled"]
+    totals = [(b, booking_totals(db, b["id"])) for b in booking_rows()]
     balance_due = sum(max(t["balance"], 0) for b, t in totals)
-    refunds_due = sum(-t["balance"] for b, t in totals if b["status"] == "Returned" and t["balance"] < 0)
+    refunds_due = sum(-t["balance"] for b, t in totals
+                      if b["status"] in ("Returned", "Cancelled") and t["balance"] < 0)
     fin = month_finance(db, month)
     stats = {
         "soon": len(soon) + len(by_key.get("today", [])) + len(by_key.get("pending", [])),
@@ -104,6 +106,11 @@ def dashboard():
             "SELECT COALESCE(SUM(qty),0) FROM damages WHERE status='Open'"
         ).fetchone()[0],
         "staff_total": db.execute("SELECT COUNT(*) FROM staff WHERE active=1").fetchone()[0],
+        "staff_unmarked": db.execute(
+            """SELECT COUNT(*) FROM staff s WHERE s.active=1 AND NOT EXISTS
+               (SELECT 1 FROM attendance a WHERE a.staff_id=s.id AND a.day=?)""",
+            (date.today().isoformat(),),
+        ).fetchone()[0],
         "staff_present": db.execute(
             """SELECT COUNT(*) FROM attendance a JOIN staff s ON s.id=a.staff_id
                WHERE a.day=? AND a.status IN ('Present','Half') AND s.active=1""",
@@ -123,7 +130,7 @@ def more():
 def finance():
     db = get_db()
     month = parse_month(request.args.get("month"))
-    totals = [(b, booking_totals(db, b["id"])) for b in booking_rows() if b["status"] != "Cancelled"]
+    totals = [(b, booking_totals(db, b["id"])) for b in booking_rows()]
     by_category = db.execute(
         "SELECT category, SUM(amount) AS total FROM expenses WHERE paid_on LIKE ? "
         "GROUP BY category ORDER BY total DESC", (month + "%",)).fetchall()
@@ -131,7 +138,7 @@ def finance():
         "finance.html", month=month, f=month_finance(db, month), by_category=by_category,
         prev_month=shift_month(month, -1), next_month=shift_month(month, 1),
         to_collect=sum(max(t["balance"], 0) for b, t in totals),
-        to_refund=sum(-t["balance"] for b, t in totals if b["status"] == "Returned" and t["balance"] < 0),
+        to_refund=sum(-t["balance"] for b, t in totals if b["status"] in ("Returned", "Cancelled") and t["balance"] < 0),
     )
 
 
@@ -472,6 +479,20 @@ def booking_status(booking_id):
     return redirect(url_for("booking_view", booking_id=booking_id))
 
 
+@app.route("/bookings/<int:booking_id>/cancel-fee", methods=["POST"])
+def booking_cancel_fee(booking_id):
+    errors = []
+    fee = money_field(request.form, "cancel_fee", errors, "Cancellation fee")
+    if errors:
+        flash(errors[0], "error")
+    else:
+        db = get_db()
+        db.execute("UPDATE bookings SET cancel_fee = ? WHERE id = ? AND status = 'Cancelled'", (fee, booking_id))
+        db.commit()
+        flash(_("Cancellation fee saved."), "ok")
+    return redirect(url_for("booking_view", booking_id=booking_id))
+
+
 @app.route("/bookings/<int:booking_id>/payment", methods=["POST"])
 def booking_payment(booking_id):
     try:
@@ -504,6 +525,60 @@ def booking_delete(booking_id):
     db.commit()
     flash(_("Booking deleted."), "ok")
     return redirect(url_for("bookings"))
+
+
+# ---------- Optional login (set APP_PASSWORD to turn it on) ----------
+APP_PASSWORD = os.environ.get("APP_PASSWORD", "")
+app.jinja_env.globals["login_enabled"] = bool(APP_PASSWORD)
+
+
+@app.before_request
+def require_login():
+    if APP_PASSWORD and not session.get("auth") and request.endpoint not in ("login", "static", "set_language"):
+        return redirect(url_for("login", next=request.full_path.rstrip("?")))
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        if APP_PASSWORD and hmac.compare_digest(request.form.get("password", ""), APP_PASSWORD):
+            session["auth"] = True
+            session.permanent = True
+            nxt = request.args.get("next", "")
+            return redirect(nxt if nxt.startswith("/") and not nxt.startswith("//") else url_for("dashboard"))
+        flash(_("Wrong password."), "error")
+    return render_template("login.html")
+
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("login"))
+
+
+# ---------- Automatic daily backup (kept in the backups/ folder, last 14 days) ----------
+BACKUP_DIR = os.environ.get("BACKUP_DIR", os.path.join(os.path.dirname(os.path.abspath(__file__)), "backups"))
+_last_backup_day = None
+
+
+@app.before_request
+def auto_backup():
+    global _last_backup_day
+    today_s = date.today().isoformat()
+    if _last_backup_day == today_s or request.endpoint == "static":
+        return
+    _last_backup_day = today_s
+    try:
+        os.makedirs(BACKUP_DIR, exist_ok=True)
+        target = os.path.join(BACKUP_DIR, f"rental-{today_s}.db")
+        if not os.path.exists(target):
+            dest = sqlite3.connect(target)
+            get_db().backup(dest)
+            dest.close()
+        for old in sorted(f for f in os.listdir(BACKUP_DIR) if f.startswith("rental-"))[:-14]:
+            os.remove(os.path.join(BACKUP_DIR, old))
+    except OSError:
+        pass
 
 
 core.init_db()
