@@ -39,7 +39,7 @@ a.card:active { transform: scale(.99); }
 .section { display: flex; justify-content: space-between; align-items: baseline; margin: 20px 2px 10px; }
 .section h2 { font-size: 1.1rem; }
 .section a { color: var(--primary); font-size: .9rem; font-weight: 600; }
-.tiles { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; margin-top: 18px; }
+.tiles { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; margin-top: 18px; }
 .tile { border-radius: 22px; padding: 14px; min-height: 118px; position: relative; overflow: hidden;
   display: flex; flex-direction: column; justify-content: space-between; font-weight: 700; font-size: 1.05rem; }
 .tile .emoji { font-size: 3rem; align-self: flex-end; line-height: 1; }
@@ -161,7 +161,9 @@ table.lines tr.total td { font-weight: 800; border-top: 2px solid var(--ink); }
 @media (max-width: 400px) {
   .grid2 { grid-template-columns: minmax(0, 1fr); }
   .seg { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .tiles .small { grid-column: span 3; }
+  .tile.small { padding: 10px 8px; font-size: .85rem; overflow-wrap: anywhere; }
+  .tile.small .count { font-size: .75rem; }
+  .tile.small .emoji { font-size: 2.4rem; }
 }
 
 @media print {
