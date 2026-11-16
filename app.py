@@ -375,6 +375,9 @@ def booking_new(booking_id=None):
         if not existing:
             return redirect(url_for("bookings"))
     all_items = db.execute("SELECT * FROM items ORDER BY category, name").fetchall()
+    category_items = {category: [] for category in core.ITEM_CATEGORIES}
+    for item in all_items:
+        category_items.setdefault(item["category"], []).append(item)
     if request.method == "POST":
         form = request.form
     elif existing and not request.args:
@@ -483,7 +486,7 @@ def booking_new(booking_id=None):
             flash(_("Booking updated.") if existing else _("Booking created."), "ok")
             return redirect(url_for("booking_view", booking_id=bid))
 
-    return render_template("booking_form.html", items=all_items, avail=avail,
+    return render_template("booking_form.html", category_items=category_items, avail=avail,
                            form=form, event_types=EVENT_TYPES, editing=existing)
 
 

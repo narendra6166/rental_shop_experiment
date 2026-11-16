@@ -18,9 +18,9 @@
   <div class="stat"><b>{{ summary.damaged }}</b><span>{{ _('Damaged') }}</span></div>
 </div>
 {% for category, rows in category_rows.items() %}
-<details class="stock-category" name="stock-category">
+<details class="item-category" name="stock-category">
   <summary><h2>{{ _(category) }}</h2></summary>
-  <div class="stock-category-items">
+  <div class="category-items">
 {% for r in rows %}
 {% set total = r.i.total_qty %}
 {% set cls = 'zero' if r.free <= 0 else ('low' if r.free * 4 <= total else 'ok') %}
