@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}{{ _('Payment receipt #{n}', n=payment.id) }}{% endblock %}
+{% block fab %}{% endblock %}
+{% block content %}
+<div class="card invoice">
+  <h2>{{ _(shop_name) }}</h2><p>{{ shop_address }}{% if shop_phone %}<br>{{ shop_phone }}{% endif %}</p>
+  <h3>{{ _('Payment receipt #{n}', n=payment.id) }}</h3>
+  <p>{{ _('Booking #{n}', n=payment.booking_id) }} · {{ payment.paid_on|dmy('%d %b %Y') }}</p>
+  <p><strong>{{ payment.name }}</strong><br>{{ payment.phone }}<br>{{ payment.address or '' }}</p>
+  <table class="lines">
+    <tr><td>{{ _('Type') }}</td><td>{{ _(payment.kind) }}</td></tr>
+    <tr><td>{{ _('Payment method') }}</td><td>{{ _(payment.method) }}</td></tr>
+    {% if payment.reference %}<tr><td>{{ _('Reference') }}</td><td>{{ payment.reference }}</td></tr>{% endif %}
+    <tr class="total"><td>{{ _('Refunded') if payment.kind == 'Deposit refund' else _('Received') }}</td><td class="num">{{ payment.amount|money }}</td></tr>
+  </table>
+  <p class="muted">{{ _('Records a payment entered in the app; it does not verify a bank transfer.') }}</p>
+  <button class="btn block noprint" onclick="window.print()">{{ _('Print / Save PDF') }}</button>
+</div>
+{% endblock %}

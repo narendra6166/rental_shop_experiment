@@ -35,7 +35,7 @@ class AccountTests(unittest.TestCase):
         self.client = self.app.test_client()
         with self.app.app_context():
             db = self.db.get_db()
-            for table in ("work_assignments", "bookings", "customers", "staff", "users", "login_attempts"):
+            for table in ("activity_log", "refund_requests", "work_assignments", "bookings", "customers", "staff", "users", "login_attempts"):
                 db.execute(f"DELETE FROM {table}")
             self.ids = {}
             for role in ("Owner", "Partner", "Agent", "Accounts", "Staff", "Worker"):
@@ -335,6 +335,123 @@ class AccountTests(unittest.TestCase):
             self.assertNotIn(b"/backup", response.data)
         self.as_role("Worker")
         self.assertEqual(self.client.get("/language").status_code, 200)
+
+    def test_partial_deliveries_returns_and_audit_preserve_outstanding_stock(self):
+        self.as_role("Owner")
+        with self.app.app_context():
+            db = self.db.get_db()
+            db.execute("UPDATE booking_items SET qty=10 WHERE booking_id=?", (self.booking_id,))
+            line_id = db.execute("SELECT id FROM booking_items WHERE booking_id=?", (self.booking_id,)).fetchone()[0]
+            db.commit()
+        url = f"/bookings/{self.booking_id}/movement"
+        self.assertEqual(self.post(url, {"kind": "dispatch", f"move_{line_id}": "10"}).status_code, 302)
+        self.assertEqual(self.post(url, {"kind": "return", f"move_{line_id}": "8"}).status_code, 302)
+        with self.app.app_context():
+            db = self.db.get_db()
+            line = db.execute("SELECT * FROM booking_items WHERE id=?", (line_id,)).fetchone()
+            self.assertEqual((line["dispatched_qty"], line["returned_qty"]), (10, 8))
+            self.assertEqual(db.execute("SELECT status FROM bookings WHERE id=?", (self.booking_id,)).fetchone()[0], "Delivered")
+            reserved = self.db.booked_qty(db, 1, "2027-01-01", "2027-01-01")
+            self.assertEqual(reserved, 2)
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM activity_log WHERE action='operations.movement' AND resource LIKE ?", (f'%\"booking_id\": {self.booking_id},%',)).fetchone()[0], 2)
+        self.assertEqual(self.post(url, {"kind": "return", f"move_{line_id}": "3"}).status_code, 400)
+        self.assertIn(b"Use delivery and return tracking", self.post(
+            f"/bookings/{self.booking_id}/status", {"status": "Cancelled"}, follow_redirects=True).data)
+        self.assertEqual(self.post(url, {"kind": "return", f"move_{line_id}": "2"}).status_code, 302)
+        with self.app.app_context():
+            db = self.db.get_db()
+            self.assertEqual(db.execute("SELECT status FROM bookings WHERE id=?", (self.booking_id,)).fetchone()[0], "Returned")
+        self.as_role("Worker")
+        self.assertEqual(self.post(url, {"kind": "dispatch", f"move_{line_id}": "1"}).status_code, 403)
+        self.assertEqual(self.client.get("/activity").status_code, 403)
+
+    def test_payments_refunds_receipts_and_customer_ledger(self):
+        self.as_role("Accounts")
+        url = f"/bookings/{self.booking_id}/payment"
+        for data in ({"amount": "nan"}, {"amount": "inf"}, {"amount": "-1"},
+                     {"amount": "1.001"}, {"amount": "5", "method": "UPI"}):
+            self.assertEqual(self.post(url, data).status_code, 400)
+        self.assertEqual(self.post(url, {"amount": "150", "kind": "Payment",
+                                        "method": "UPI", "reference": "TEST-REF"}).status_code, 302)
+        self.assertEqual(self.post(url, {"amount": "51", "kind": "Deposit refund"}).status_code, 400)
+        self.assertEqual(self.post(url, {"amount": "50", "kind": "Deposit refund"}).status_code, 302)
+        with self.app.app_context():
+            db = self.db.get_db()
+            refund_id = db.execute("SELECT id FROM refund_requests").fetchone()[0]
+            payment_id = db.execute("SELECT id FROM payments").fetchone()[0]
+            customer_id = db.execute("SELECT customer_id FROM bookings WHERE id=?", (self.booking_id,)).fetchone()[0]
+            self.assertEqual(self.db.booking_totals(db, self.booking_id)["refunded"], 0)
+        review = f"/refunds/{refund_id}/review"
+        self.assertEqual(self.post(review, {"decision": "approve"}).status_code, 403)
+        self.as_role("Owner")
+        self.assertEqual(self.post(review, {"decision": "approve"}).status_code, 302)
+        self.assertEqual(self.post(review, {"decision": "approve"}).status_code, 400)
+        with self.app.app_context():
+            self.assertEqual(self.db.booking_totals(self.db.get_db(), self.booking_id)["refunded"], 50)
+        self.assertIn(b"TEST-REF", self.client.get(f"/payments/{payment_id}/receipt").data)
+        self.assertIn(b"Customer ledger", self.client.get(f"/customers/{customer_id}/ledger").data)
+        self.as_role("Agent")
+        self.assertEqual(self.client.get(f"/customers/{customer_id}/ledger").status_code, 403)
+        self.assertEqual(self.client.get(f"/payments/{payment_id}/receipt").status_code, 403)
+        self.assertEqual(self.client.get(f"/bookings/{self.booking_id}/invoice").status_code, 403)
+        self.assertNotIn(b"TEST-REF", self.client.get(f"/bookings/{self.booking_id}").data)
+        self.as_role("Worker")
+        self.assertEqual(self.client.get(f"/payments/{payment_id}/receipt").status_code, 403)
+
+    def test_pending_refunds_recheck_balance_and_daily_role_visibility(self):
+        self.as_role("Accounts")
+        url = f"/bookings/{self.booking_id}/payment"
+        self.post(url, {"amount": "150"})
+        for _ in range(2):
+            self.assertEqual(self.post(url, {"amount": "50", "kind": "Deposit refund"}).status_code, 302)
+        self.as_role("Owner")
+        with self.app.app_context():
+            ids = [r[0] for r in self.db.get_db().execute("SELECT id FROM refund_requests ORDER BY id")]
+        self.assertEqual(self.post(f"/refunds/{ids[0]}/review", {"decision": "approve"}).status_code, 302)
+        self.assertEqual(self.post(f"/refunds/{ids[1]}/review", {"decision": "approve"}).status_code, 400)
+        response = self.client.get("/operations?day=2027-01-01")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"Assigned customer", response.data)
+        self.assertIn(b"Pending payments", response.data)
+        self.as_role("Agent")
+        response = self.client.get("/operations?day=2027-01-01")
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn(b"Pending payments", response.data)
+        self.as_role("Staff")
+        self.assertEqual(self.client.get("/operations").status_code, 403)
+
+    def test_movement_guards_preserve_history_and_full_return_deposit(self):
+        self.as_role("Owner")
+        with self.app.app_context():
+            db = self.db.get_db()
+            db.execute("UPDATE booking_items SET qty=2,deposit=10 WHERE booking_id=?", (self.booking_id,))
+            line_id = db.execute("SELECT id FROM booking_items WHERE booking_id=?", (self.booking_id,)).fetchone()[0]
+            db.commit()
+        url = f"/bookings/{self.booking_id}/movement"
+        self.assertEqual(self.post(url, {"kind": "dispatch", f"move_{line_id}": "3"}).status_code, 400)
+        self.post(url, {"kind": "dispatch", f"move_{line_id}": "2"})
+        self.assertIn(b"Items have been dispatched", self.client.get(
+            f"/bookings/{self.booking_id}/edit", follow_redirects=True).data)
+        self.assertIn(b"Dispatched bookings cannot be deleted", self.post(
+            f"/bookings/{self.booking_id}/delete", follow_redirects=True).data)
+        self.post(url, {"kind": "return", f"move_{line_id}": "1"})
+        with self.app.app_context():
+            self.assertEqual(self.db.booking_totals(self.db.get_db(), self.booking_id)["total"], 220)
+        self.post(url, {"kind": "return", f"move_{line_id}": "1"})
+        with self.app.app_context():
+            self.assertEqual(self.db.booking_totals(self.db.get_db(), self.booking_id)["total"], 200)
+
+    def test_activity_filters_and_failed_mutations_do_not_create_events(self):
+        self.as_role("Owner")
+        url = f"/bookings/{self.booking_id}/payment"
+        self.assertEqual(self.post(url, {"amount": "bad"}).status_code, 400)
+        with self.app.app_context():
+            self.assertEqual(self.db.get_db().execute("SELECT COUNT(*) FROM activity_log").fetchone()[0], 0)
+        self.post(url, {"amount": "10"})
+        response = self.client.get("/activity?actor=owner&period=all")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"booking_payment", response.data)
+        self.assertNotIn(b"booking_payment", self.client.get("/activity?actor=nobody").data)
 
 
 if __name__ == "__main__":

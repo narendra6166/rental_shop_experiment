@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}{{ _('Daily operations') }}{% endblock %}
+{% block fab %}{% endblock %}
+{% block content %}
+<form class="card" method="get"><label for="day">{{ _('Date') }}</label><div class="grid2"><input id="day" type="date" name="day" value="{{ day }}" required><button class="btn">{{ _('Apply filters') }}</button></div></form>
+<p class="muted">{{ _('Current pending work due by the selected date, including overdue work; not a historical snapshot.') }}</p>
+<div class="section"><h2>{{ _('Pending deliveries') }} ({{ deliveries|length }})</h2></div>
+{% for booking in deliveries %}
+<a class="card row between" href="{{ url_for('booking_view', booking_id=booking.id) }}"><div class="grow"><strong>#{{ booking.id }} · {{ booking.customer }}</strong><div class="muted">{{ booking.start_date|dmy }} · {{ _('{n} units', n=booking.to_send) }}</div></div><span>›</span></a>
+{% else %}<div class="card muted">{{ _('Nothing pending') }}</div>{% endfor %}
+<div class="section"><h2>{{ _('Collections due') }} ({{ collections|length }})</h2></div>
+{% for booking in collections %}
+<a class="card row between" href="{{ url_for('booking_view', booking_id=booking.id) }}"><div class="grow"><strong>#{{ booking.id }} · {{ booking.customer }}</strong><div class="muted">{{ booking.end_date|dmy }} · {{ _('{n} units', n=booking.outstanding) }}{% if booking.end_date < day %} · {{ _('Overdue return') }}{% endif %}</div></div><span>›</span></a>
+{% else %}<div class="card muted">{{ _('Nothing pending') }}</div>{% endfor %}
+<div class="section"><h2>{{ _('Pending assigned work') }} ({{ tasks|length }})</h2></div>
+{% for task in tasks %}
+<a class="card" href="{{ url_for('booking_view', booking_id=task.booking_id) }}"><strong>#{{ task.booking_id }} · {{ task.name }}</strong><div>{{ task.task }}</div><div class="muted">{{ _(task.status) }}</div></a>
+{% else %}<div class="card muted">{{ _('Nothing pending') }}</div>{% endfor %}
+{% if can('finance') %}
+<div class="section"><h2>{{ _('Pending payments') }} ({{ payments|length }})</h2></div>
+{% for booking, balance in payments %}
+<a class="card row between" href="{{ url_for('booking_view', booking_id=booking.id) }}"><strong>#{{ booking.id }} · {{ booking.customer }}</strong><span>{{ balance|money }}</span></a>
+{% else %}<div class="card muted">{{ _('Nothing pending') }}</div>{% endfor %}
+{% endif %}
+{% endblock %}

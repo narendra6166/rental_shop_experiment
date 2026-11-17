@@ -82,6 +82,34 @@ class PhoneValidationTests(unittest.TestCase):
                     self.assertEqual(categories[2], "Tents & Event Setup")
                     self.assertEqual(categories[3], "Custom")
 
+    def test_delivery_migration_is_applied_only_once(self):
+        import sqlite3
+
+        with tempfile.TemporaryDirectory() as folder:
+            path = os.path.join(folder, "migration.db")
+            with patch.object(self.db, "DB_PATH", path):
+                self.db.init_db()
+                with sqlite3.connect(path) as db:
+                    db.execute("ALTER TABLE booking_items DROP COLUMN dispatched_qty")
+                    db.execute("ALTER TABLE booking_items DROP COLUMN returned_qty")
+                    db.execute("INSERT INTO customers (name,phone) VALUES ('Test','0123456789')")
+                    for booking_id, status in enumerate(("Booked", "Delivered", "Returned"), 1):
+                        db.execute(
+                            """INSERT INTO bookings(id,customer_id,event_type,start_date,end_date,status,created_at)
+                               VALUES (?,1,'Other','2027-01-01','2027-01-01',?,'2026-01-01')""",
+                            (booking_id, status))
+                        db.execute("INSERT INTO booking_items (booking_id,item_id,qty,rate) VALUES (?,1,5,10)",
+                                   (booking_id,))
+                self.db.init_db()
+                with sqlite3.connect(path) as db:
+                    rows = db.execute("SELECT dispatched_qty,returned_qty FROM booking_items ORDER BY booking_id").fetchall()
+                    self.assertEqual(rows, [(0, 0), (5, 0), (5, 5)])
+                    db.execute("UPDATE booking_items SET returned_qty=2 WHERE booking_id=2")
+                self.db.init_db()
+                with sqlite3.connect(path) as db:
+                    self.assertEqual(db.execute(
+                        "SELECT dispatched_qty,returned_qty FROM booking_items WHERE booking_id=2").fetchone(), (5, 2))
+
     def test_item_categories_are_validated_and_grouped_on_all_pages(self):
         data = {"name": "Homam equipment", "category": "Pooja & Rituals",
                 "total_qty": "0", "rate_per_day": "100", "deposit": "0"}

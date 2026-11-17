@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}{{ _('Activity history') }}{% endblock %}
+{% block fab %}{% endblock %}
+{% block content %}
+<form method="get" class="card">
+  <label for="actor">{{ _('Account name') }}</label><input id="actor" name="actor" value="{{ actor }}">
+  {% include "_date_filters.html" %}<button class="btn block mt">{{ _('Apply filters') }}</button>
+</form>
+<p class="muted">{{ _('Recorded changes. Times use the server timezone.') }}</p>
+{% for event in events %}
+<div class="card">
+  <strong>{{ event.actor_name }}</strong> · {{ event.created_at }}
+  <div>{{ event.action }}</div><div class="muted activity-resource">{{ event.resource }}</div>
+</div>
+{% else %}<div class="card muted">{{ _('No activity recorded yet.') }}</div>{% endfor %}
+<div class="row between">
+{% if page > 1 %}<a class="btn light" href="{{ url_for('operations.activity', actor=actor, page=page-1, **window) }}">{{ _('Previous') }}</a>{% endif %}
+<span>{{ _('Page {n}', n=page) }} / {{ pages }}</span>
+{% if page < pages %}<a class="btn light" href="{{ url_for('operations.activity', actor=actor, page=page+1, **window) }}">{{ _('Next') }}</a>{% endif %}
+</div>
+{% endblock %}

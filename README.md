@@ -46,7 +46,7 @@ The last active Owner cannot be disabled or demoted.
 | --- | --- |
 | Owner | All business data, account management, backups, inventory, attendance and work assignment |
 | Partner | Read-only business operations, payroll and finance reports; no accounts or backups |
-| Agent | Customers, bookings and booking status; read stock; no payments, payroll, expenses or finance reports |
+| Agent | Customers, bookings, delivery/returns and booking status; read stock; no bills, payments, payroll, expenses or finance reports |
 | Accounts | Read bookings and customers; record payments, cancellation fees, expenses and salary payments; view reports |
 | Staff / Worker | Their assigned work and customer contact/location for those jobs only; update their task status |
 
@@ -56,6 +56,46 @@ entries by staff name/member, month, inclusive date range, status or all dates, 
 History totals cover all matches; results are paged in batches of 50. Unmarked dates are not treated as absent.
 Booking filters match rental periods overlapping the selected month/range and retain filters across status tabs.
 The globe opens a language-only chooser, also available from More.
+
+## Daily operations and payments
+
+More > Daily operations lists pending deliveries, collections due (including overdue returns),
+unfinished assigned work, and payment balances for roles that can view finance.
+The date selects work due by that day using current records; it is not a historical snapshot.
+Staff/Worker logins continue to see only their own assigned work.
+
+On a booking, use Delivery and returns to record quantities sent or received for each item.
+For example, returning 80 of 100 dispatched chairs leaves 20 outstanding.
+Returned quantities immediately stop reserving stock. The deposit remains on the bill until
+all booked quantities are returned; partial returns do not prorate rent or deposits.
+Previously Delivered/WorkDone bookings are migrated as fully dispatched, and Returned bookings
+as fully dispatched and returned. This initialization runs only once.
+Bookings with dispatched items cannot be edited or deleted; they retain their movement history.
+Delivery/return quantities, not manual status changes, set Delivered and Returned.
+If only part of an order was supplied, return those items and cancel the remaining order;
+the cancellation fee must reflect the agreed final charge.
+
+Record payments as Cash, UPI or Bank; UPI/Bank require a reference. Cash advances can be entered
+while creating a booking; for other methods save the booking first, then add the payment.
+Existing payments whose method was not recorded are explicitly marked Not recorded.
+Each recorded payment has a printable receipt (Print / Save PDF), which can be attached in WhatsApp.
+This is manual bookkeeping, not a payment gateway or bank-transfer verification.
+Deposit refund creates a pending request, even for an Owner. Only an Owner can approve or reject it.
+Approval records the actual refund and updates the balance; verify/send the funds before approving.
+Refund limits are checked again under a database write lock, so repeated approvals cannot over-refund.
+Pending requests do not affect balances.
+
+Customers > Ledger shows each customer's current booking charges, payments, refunds and balances.
+Amounts owed and refunds due are shown separately, without moving credit between bookings.
+Owner, Partner and Accounts can access ledgers; Agent and worker roles cannot.
+More > Activity history is Owner-only, with actor/date filters and 50 changes per page.
+It records successful business mutations and delivery/return quantities in the same transaction.
+History begins after this upgrade; it is not an immutable, externally secured audit ledger.
+Times use the server timezone. Database files and downloaded backups include these records.
+
+Automatic local backups are still local copies, not off-site disaster recovery. Hosting, a persistent
+storage location, and a private off-site backup destination must be selected and configured separately.
+
 Task completion does not automatically mark a booking returned or change stock/payments.
 Assigning again to the same person replaces their task and resets its status to Assigned.
 Permissions are enforced for direct requests as well as navigation. New forms use session-bound CSRF tokens.

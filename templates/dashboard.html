@@ -20,6 +20,7 @@
 </div>
 {% endblock %}
 {% block content %}
+<a class="card row between" href="{{ url_for('operations.daily') }}"><strong>{{ _('Daily operations') }}</strong><span>›</span></a>
 <div class="tiles">
   <a class="tile big t-peach" href="{{ url_for('bookings', tab='soon') }}">
     <div>{{ _('Bookings') }}<div class="count">{{ _('{n} starting soon', n=stats.soon) }}</div></div><span class="emoji">🎪</span></a>

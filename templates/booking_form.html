@@ -39,7 +39,7 @@
   <div class="card">
     <div class="grid2">
       <div><label style="margin-top:0">{{ _('Discount (₹)') }}</label><input type="number" inputmode="decimal" min="0" step="0.01" name="discount" value="{{ form.get('discount', 0) }}"></div>
-      {% if not editing and can('booking_payment', 'POST') %}<div><label style="margin-top:0">{{ _('Advance paid (₹)') }}</label><input type="number" inputmode="decimal" min="0" step="0.01" name="advance" value="{{ form.get('advance', 0) }}"></div>{% endif %}
+      {% if not editing and can('booking_payment', 'POST') %}<div><label style="margin-top:0">{{ _('Cash advance paid (₹)') }}</label><input type="number" inputmode="decimal" min="0" step="0.01" name="advance" value="{{ form.get('advance', 0) }}"><small class="muted">{{ _('For UPI / Bank, save the booking then add a payment with its reference.') }}</small></div>{% endif %}
     </div>
     <div class="grid2">
       <div><label>{{ _('Travel charges (₹)') }}</label><input type="number" inputmode="decimal" min="0" step="0.01" name="travel_charge" value="{{ form.get('travel_charge', 0) }}"></div>

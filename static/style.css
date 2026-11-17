@@ -67,6 +67,7 @@ a.card:active { transform: scale(.99); }
 .customer-actions { display: flex; flex-direction: column; gap: 6px; flex: none; }
 .customer-actions .btn { display: block; width: 100%; }
 .work-card { overflow-wrap: anywhere; }
+.activity-resource { overflow-wrap: anywhere; }
 
 /* Pills */
 .pill { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: .75rem; font-weight: 700;

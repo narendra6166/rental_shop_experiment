@@ -1,9 +1,9 @@
 import re
 from datetime import date
 
-from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
+from flask import Blueprint, abort, flash, g, redirect, render_template, request, url_for
 
-from db import (ID_TYPES, SALARY_KINDS, SALARY_TYPES, ATTENDANCE, get_db, parse_date, parse_month,
+from db import (ID_TYPES, SALARY_KINDS, SALARY_TYPES, ATTENDANCE, commit_changes, get_db, parse_date, parse_month,
                 salary_summary, shift_month)
 from i18n import _
 from validation import valid_phone
@@ -84,12 +84,13 @@ def staff_form(staff_id=None):
                 data + (staff_id,),
             )
         else:
-            db.execute(
+            staff_id = db.execute(
                 "INSERT INTO staff (name, phone, role, monthly_salary, join_date, active, "
                 "salary_type, address, id_type, id_number) VALUES (?,?,?,?,?,?,?,?,?,?)",
                 data,
-            )
-        db.commit()
+            ).lastrowid
+        g.activity_resource = {"staff_id": staff_id}
+        commit_changes(db)
         flash(_("Staff saved."), "ok")
         return redirect(url_for("staff.staff_list"))
     return render_template("staff_form.html", p=dict(person) if person else {}, staff_id=staff_id)
@@ -134,7 +135,7 @@ def staff_pay(staff_id):
         "INSERT INTO salary_payments (staff_id, month, amount, kind, paid_on, note) VALUES (?,?,?,?,?,?)",
         (staff_id, month, amount, kind, date.today().isoformat(), request.form.get("note", "").strip()),
     )
-    db.commit()
+    commit_changes(db)
     flash(_("{kind} recorded.", kind=_(kind)), "ok")
     return redirect(url_for("staff.staff_view", staff_id=staff_id, month=month))
 
@@ -146,7 +147,7 @@ def staff_pay_delete(staff_id, pay_id):
                      (pay_id, staff_id)).fetchone()
     if row:
         db.execute("DELETE FROM salary_payments WHERE id = ?", (pay_id,))
-        db.commit()
+        commit_changes(db)
         flash(_("Payment removed."), "ok")
     return redirect(url_for("staff.staff_view", staff_id=staff_id, month=row["month"] if row else None))
 
@@ -241,5 +242,7 @@ def attendance_mark():
                    ON CONFLICT(staff_id, day) DO UPDATE SET status = excluded.status""",
                 (sid, day.isoformat(), status),
             )
-        db.commit()
+        if ids:
+            g.activity_resource = {"day": day.isoformat(), "staff_ids": ids, "status": status}
+        commit_changes(db)
     return redirect(url_for("staff.attendance", day=day.isoformat()))

@@ -10,6 +10,7 @@
   <div class="avatar">{{ c.name[:1]|upper }}</div>
   <div class="grow"><strong>{{ c.name }}</strong><div class="muted">{{ c.phone }}{% if c.address %} · {{ c.address }}{% endif %}</div></div>
   <div class="customer-actions">
+    {% if can('operations.ledger') %}<a class="btn light sm" href="{{ url_for('operations.ledger', customer_id=c.id) }}">{{ _('Ledger') }}</a>{% endif %}
     {% if can('booking_new') %}<a class="btn light sm" href="{{ url_for('booking_new', customer_id=c.id) }}">{{ _('Book') }}</a>{% endif %}
     {% if can('customer_delete', 'POST') %}
     <form method="post" action="{{ url_for('customer_delete', customer_id=c.id) }}" onsubmit="return confirm({{ _('Delete this customer?')|tojson|forceescape }})">

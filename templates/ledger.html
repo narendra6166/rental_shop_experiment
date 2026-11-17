@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}{{ _('Customer ledger') }}{% endblock %}
+{% block fab %}{% endblock %}
+{% block content %}
+<div class="card"><h3>{{ customer.name }}</h3>{{ customer.phone }}
+<p>{{ _('Balance due') }}: <strong>{{ due|money }}</strong><br>{{ _('Refund due') }}: <strong>{{ credit|money }}</strong></p>
+<p class="muted">{{ _('Current booking balances, not a historical statement. Refunds are not offset against other bookings.') }}</p></div>
+{% for booking, totals in entries %}
+<div class="card">
+  <a href="{{ url_for('booking_view', booking_id=booking.id) }}"><strong>{{ _('Booking #{n}', n=booking.id) }}</strong></a> · {{ _(booking.status) }}
+  <p class="muted">{{ booking.start_date|dmy('%d %b %Y') }} → {{ booking.end_date|dmy('%d %b %Y') }}</p>
+  <table class="lines">
+    <tr><td>{{ _('Total') }}</td><td class="num">{{ totals.total|money }}</td></tr>
+    <tr><td>{{ _('Paid') }}</td><td class="num">{{ totals.paid|money }}</td></tr>
+    <tr><td>{{ _('Refunded') }}</td><td class="num">{{ totals.refunded|money }}</td></tr>
+    <tr class="total"><td>{{ _('Refund due') if totals.balance < 0 else _('Balance due') }}</td><td class="num">{{ totals.balance|abs|money }}</td></tr>
+  </table>
+  {% for payment in totals.payments %}<p><a href="{{ url_for('operations.receipt', payment_id=payment.id) }}">{{ payment.paid_on|dmy }} · {{ _(payment.kind) }} · {{ payment.amount|money }}</a></p>{% endfor %}
+</div>
+{% else %}<div class="card muted">{{ _('No bookings found') }}</div>{% endfor %}
+{% endblock %}

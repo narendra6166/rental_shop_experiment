@@ -1,14 +1,23 @@
 import calendar
+import json
 import os
 import sqlite3
 from datetime import date, datetime, timedelta
 
-from flask import g
+from flask import g, has_request_context, request
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.environ.get("RENTAL_DB", os.path.join(BASE_DIR, "rental.db"))
 
 SCHEMA = """
+CREATE TABLE IF NOT EXISTS activity_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    actor_id INTEGER,
+    actor_name TEXT NOT NULL,
+    action TEXT NOT NULL,
+    resource TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT NOT NULL COLLATE NOCASE UNIQUE,
@@ -70,6 +79,17 @@ CREATE TABLE IF NOT EXISTS payments (
     amount REAL NOT NULL,
     kind TEXT NOT NULL,
     paid_on TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS refund_requests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    booking_id INTEGER NOT NULL REFERENCES bookings(id),
+    amount REAL NOT NULL CHECK (amount>0),
+    method TEXT NOT NULL,
+    reference TEXT NOT NULL DEFAULT '',
+    requested_by INTEGER NOT NULL REFERENCES users(id),
+    status TEXT NOT NULL DEFAULT 'Pending',
+    reviewed_by INTEGER REFERENCES users(id),
+    created_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS damages (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -157,6 +177,14 @@ STOCK_PURCHASE = "New stock purchase"
 
 # Columns added after the first release; applied to existing databases on start-up.
 MIGRATIONS = {
+    "payments": [
+        ("method", "TEXT NOT NULL DEFAULT 'Not recorded'"),
+        ("reference", "TEXT NOT NULL DEFAULT ''"),
+    ],
+    "booking_items": [
+        ("dispatched_qty", "INTEGER NOT NULL DEFAULT 0"),
+        ("returned_qty", "INTEGER NOT NULL DEFAULT 0"),
+    ],
     "staff": [
         ("salary_type", "TEXT NOT NULL DEFAULT 'Monthly'"),
         ("address", "TEXT"),
@@ -197,14 +225,34 @@ def close_db(_exc=None):
         db.close()
 
 
+def commit_changes(db):
+    """Keep the actor record in the same transaction as the business change."""
+    if db.in_transaction and has_request_context() and g.get("user"):
+        db.execute(
+            "INSERT INTO activity_log (actor_id,actor_name,action,resource,created_at) VALUES (?,?,?,?,?)",
+            (g.user["id"], g.user["username"], request.endpoint,
+             json.dumps(g.get("activity_resource", request.view_args or {}), sort_keys=True),
+             datetime.now().isoformat(timespec="seconds")),
+        )
+    db.commit()
+
+
 def init_db():
     db = sqlite3.connect(DB_PATH)
     db.executescript(SCHEMA)
+    db.execute("BEGIN IMMEDIATE")
+    migrate_deliveries = "dispatched_qty" not in {
+        r[1] for r in db.execute("PRAGMA table_info(booking_items)")}
     for table, columns in MIGRATIONS.items():
         existing = {r[1] for r in db.execute(f"PRAGMA table_info({table})")}
         for name, ddl in columns:
             if name not in existing:
                 db.execute(f"ALTER TABLE {table} ADD COLUMN {name} {ddl}")
+    if migrate_deliveries:
+        db.execute("""UPDATE booking_items SET dispatched_qty=qty WHERE booking_id IN
+                      (SELECT id FROM bookings WHERE status IN ('Delivered','WorkDone','Returned'))""")
+        db.execute("""UPDATE booking_items SET returned_qty=qty WHERE booking_id IN
+                      (SELECT id FROM bookings WHERE status='Returned')""")
     if db.execute("SELECT COUNT(*) FROM items").fetchone()[0] == 0:
         db.executemany(
             "INSERT INTO items (name, category, total_qty, rate_per_day, deposit) VALUES (?,?,?,?,?)",
@@ -242,17 +290,22 @@ def rental_days(start, end):
 
 
 # ---------- Stock ----------
-def booked_qty(db, item_id, start, end, exclude_booking=None, statuses=("Booked", "Delivered", "WorkDone")):
+def booked_qty(db, item_id, start, end, exclude_booking=None, statuses=("Booked", "Delivered", "WorkDone"),
+               quantity="reserved"):
     """Max units of an item unavailable on any single day within [start, end].
 
     A delivered booking keeps its items out until it is marked returned, so an overdue
     one blocks stock up to today even though its end date has passed.
     """
+    expression = {"reserved": "bi.qty-bi.returned_qty",
+                  "out": "bi.dispatched_qty-bi.returned_qty",
+                  "pending": "bi.qty-bi.dispatched_qty"}[quantity]
     rows = db.execute(
-        """SELECT b.start_date, b.end_date, b.status, bi.qty FROM booking_items bi
+        """SELECT b.start_date, b.end_date, b.status,
+                  {} AS qty FROM booking_items bi
            JOIN bookings b ON b.id = bi.booking_id
            WHERE bi.item_id = ? AND b.status IN ({})
-             AND b.id IS NOT ?""".format(",".join("?" * len(statuses))),
+             AND b.id IS NOT ?""".format(expression, ",".join("?" * len(statuses))),
         (item_id, *statuses, exclude_booking),
     ).fetchall()
     today = date.today().isoformat()

@@ -2,7 +2,7 @@ from datetime import date
 
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 
-from db import ITEM_CATEGORIES, OUT_STATUSES, booked_qty, damaged_open, get_db, parse_date
+from db import ITEM_CATEGORIES, OUT_STATUSES, booked_qty, commit_changes, damaged_open, get_db, parse_date
 from i18n import _
 
 stock_bp = Blueprint("stock", __name__)
@@ -21,18 +21,20 @@ def stock():
     rows = []
     for i in db.execute("SELECT * FROM items ORDER BY category, name").fetchall():
         # Everything below is for the selected dates (peak on any single day).
-        booked = booked_qty(db, i["id"], start_s, end_s, statuses=("Booked",))
-        on_rent = booked_qty(db, i["id"], start_s, end_s, statuses=OUT_STATUSES)
+        booked = booked_qty(db, i["id"], start_s, end_s, quantity="pending")
+        on_rent = booked_qty(db, i["id"], start_s, end_s, statuses=OUT_STATUSES, quantity="out")
         taken = booked_qty(db, i["id"], start_s, end_s)
         damaged = damaged_open(db, i["id"])
         rows.append({"i": i, "booked": booked, "on_rent": on_rent, "taken": taken,
                      "damaged": damaged, "free": i["total_qty"] - damaged - taken})
     pending = db.execute(
         """SELECT b.id, b.end_date, b.start_date, c.name AS customer, c.phone,
-                  GROUP_CONCAT(i.name || ' × ' || bi.qty, ', ') AS items, SUM(bi.qty) AS qty
+                  GROUP_CONCAT(i.name || ' × ' || (bi.dispatched_qty-bi.returned_qty), ', ') AS items,
+                  SUM(bi.dispatched_qty-bi.returned_qty) AS qty
            FROM bookings b JOIN customers c ON c.id = b.customer_id
            JOIN booking_items bi ON bi.booking_id = b.id JOIN items i ON i.id = bi.item_id
-           WHERE b.status IN ('Delivered', 'WorkDone') GROUP BY b.id ORDER BY b.end_date""").fetchall()
+           WHERE b.status IN ('Delivered', 'WorkDone') AND bi.dispatched_qty>bi.returned_qty
+           GROUP BY b.id ORDER BY b.end_date""").fetchall()
     summary = {
         "total": sum(r["i"]["total_qty"] for r in rows),
         "free": sum(max(r["free"], 0) for r in rows),
@@ -92,7 +94,7 @@ def damage_new():
                     (item_id, booking_id, qty, kind, charge, form.get("note", "").strip(),
                      date.today().isoformat()),
                 )
-                db.commit()
+                commit_changes(db)
                 flash(_("Damage recorded. Stock updated."), "ok")
                 if booking_id:
                     return redirect(url_for("booking_view", booking_id=booking_id))
@@ -113,5 +115,5 @@ def damage_resolve(damage_id):
                        (d["qty"], d["item_id"]))
             db.execute("UPDATE damages SET status = 'Written off' WHERE id = ?", (damage_id,))
             flash(_("Written off. Total stock reduced."), "ok")
-        db.commit()
+        commit_changes(db)
     return redirect(url_for("stock.damages"))

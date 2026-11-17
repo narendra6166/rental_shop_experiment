@@ -1,22 +1,24 @@
 import os
+import math
 import secrets
 import sqlite3
 import tempfile
 from datetime import date, datetime, timedelta
 
-from flask import (Flask, flash, make_response, redirect, render_template, request, send_file,
+from flask import (Flask, abort, flash, g, make_response, redirect, render_template, request, send_file,
                    url_for)
 
 import db as core
 from accounts import allowed, bootstrap_owner, install_accounts
 from i18n import LANGS, _, fmt_date, get_lang
-from db import (EVENT_TYPES, EXPENSE_CATEGORIES, PAYMENT_KINDS, STATUS_TABS, STATUSES,
+from db import (EVENT_TYPES, EXPENSE_CATEGORIES, PAYMENT_KINDS, STATUS_TABS, STATUSES, commit_changes,
                 STOCK_PURCHASE, available_qty, booking_totals, get_db, month_finance, parse_date,
                 parse_month, shift_month, status_info)
 from staff import staff_bp
 from stock import stock_bp
 from validation import valid_phone
 from filters import date_window
+from operations import operations_bp, record_payment
 
 SHOP_NAME = os.environ.get("SHOP_NAME", "Ganesh Hyres")
 SHOP_ADDRESS = os.environ.get(
@@ -31,6 +33,7 @@ app.teardown_appcontext(core.close_db)
 install_accounts(app)
 app.register_blueprint(staff_bp)
 app.register_blueprint(stock_bp)
+app.register_blueprint(operations_bp)
 app.jinja_env.globals.update(salary_types=core.SALARY_TYPES, id_types=core.ID_TYPES,
                            item_categories=core.ITEM_CATEGORIES,
                            status_info=status_info, shop_name=SHOP_NAME, shop_address=SHOP_ADDRESS,
@@ -189,7 +192,7 @@ def expense_new():
             )
             if stock_buy:
                 db.execute("UPDATE items SET total_qty = total_qty + ? WHERE id = ?", (qty, item_id))
-            db.commit()
+            commit_changes(db)
             flash(_("Expense saved."), "ok")
             return redirect(url_for("expenses", month=paid_on[:7]))
     return render_template("expense_form.html", items=items, form=form, categories=EXPENSE_CATEGORIES,
@@ -205,7 +208,7 @@ def expense_delete(expense_id):
             db.execute("UPDATE items SET total_qty = MAX(total_qty - ?, 0) WHERE id = ?",
                        (e["qty"], e["item_id"]))
         db.execute("DELETE FROM expenses WHERE id = ?", (expense_id,))
-        db.commit()
+        commit_changes(db)
         flash(_("Expense deleted."), "ok")
     return redirect(url_for("expenses", month=e["paid_on"][:7] if e else None))
 
@@ -254,7 +257,7 @@ def item_form(item_id=None):
             return render_template("item_form.html", item=request.form, item_id=item_id)
         if item_id:
             out_now = db.execute(
-                """SELECT COALESCE(SUM(bi.qty), 0) FROM booking_items bi JOIN bookings b ON b.id = bi.booking_id
+                """SELECT COALESCE(SUM(bi.dispatched_qty-bi.returned_qty), 0) FROM booking_items bi JOIN bookings b ON b.id = bi.booking_id
                    WHERE bi.item_id = ? AND b.status IN ('Delivered', 'WorkDone')""", (item_id,)).fetchone()[0]
             if data[2] < out_now:
                 flash(_("{n} units are out on rent, total cannot be less than that.", n=out_now), "error")
@@ -268,7 +271,7 @@ def item_form(item_id=None):
                 "INSERT INTO items (name, category, total_qty, rate_per_day, deposit) VALUES (?,?,?,?,?)",
                 data,
             )
-        db.commit()
+        commit_changes(db)
         flash(_("Item saved."), "ok")
         return redirect(url_for("items"))
     return render_template("item_form.html", item=item, item_id=item_id)
@@ -279,7 +282,7 @@ def item_delete(item_id):
     db = get_db()
     try:
         db.execute("DELETE FROM items WHERE id = ?", (item_id,))
-        db.commit()
+        commit_changes(db)
         flash(_("Item deleted."), "ok")
     except sqlite3.IntegrityError:
         flash(_("Item is used in bookings or damage records and cannot be deleted."), "error")
@@ -313,7 +316,7 @@ def customer_new():
             "INSERT INTO customers (name, phone, address) VALUES (?,?,?)",
             (name, phone, request.form.get("address", "").strip()),
         )
-        db.commit()
+        commit_changes(db)
         flash(_("Customer added."), "ok")
         if request.args.get("next") == "booking":
             return redirect(url_for("booking_new", customer_id=cur.lastrowid))
@@ -326,7 +329,7 @@ def customer_delete(customer_id):
     db = get_db()
     try:
         cur = db.execute("DELETE FROM customers WHERE id = ?", (customer_id,))
-        db.commit()
+        commit_changes(db)
         if cur.rowcount:
             flash(_("Customer deleted."), "ok")
         else:
@@ -371,7 +374,7 @@ def bookings():
 def money_field(form, name, errors, label):
     try:
         v = float(form.get(name) or 0)
-        if v < 0:
+        if not math.isfinite(v) or v < 0:
             raise ValueError
         return v
     except ValueError:
@@ -383,11 +386,17 @@ def money_field(form, name, errors, label):
 @app.route("/bookings/<int:booking_id>/edit", methods=["GET", "POST"])
 def booking_new(booking_id=None):
     db = get_db()
+    if request.method == "POST":
+        db.execute("BEGIN IMMEDIATE")
     existing = None
     if booking_id:
         existing = db.execute("SELECT * FROM bookings WHERE id = ?", (booking_id,)).fetchone()
         if not existing:
             return redirect(url_for("bookings"))
+        if db.execute("SELECT 1 FROM booking_items WHERE booking_id=? AND dispatched_qty>0",
+                      (booking_id,)).fetchone():
+            flash(_("Items have been dispatched. Use delivery and return tracking instead of editing this booking."), "error")
+            return redirect(url_for("booking_view", booking_id=booking_id))
     all_items = db.execute("SELECT * FROM items ORDER BY category, name").fetchall()
     category_items = {category: [] for category in core.ITEM_CATEGORIES}
     for item in all_items:
@@ -492,10 +501,11 @@ def booking_new(booking_id=None):
             if not existing:
                 if advance > 0:
                     db.execute(
-                        "INSERT INTO payments (booking_id, amount, kind, paid_on) VALUES (?,?,?,?)",
-                        (bid, advance, "Advance", date.today().isoformat()),
+                        "INSERT INTO payments (booking_id, amount, kind, paid_on,method) VALUES (?,?,?,?,?)",
+                        (bid, advance, "Advance", date.today().isoformat(), "Cash"),
                     )
-            db.commit()
+            g.activity_resource = {"booking_id": bid}
+            commit_changes(db)
             flash(_("Booking updated.") if existing else _("Booking created."), "ok")
             return redirect(url_for("booking_view", booking_id=bid))
 
@@ -524,8 +534,10 @@ def booking_view(booking_id):
     workers = db.execute(
         "SELECT id,name,role FROM users WHERE active=1 AND role IN ('Staff','Worker') ORDER BY name"
     ).fetchall()
+    refunds = db.execute(
+        "SELECT * FROM refund_requests WHERE booking_id=? ORDER BY id DESC", (booking_id,)).fetchall()
     return render_template("booking_view.html", b=dict(b, balance=t["balance"]), t=t,
-                           kinds=PAYMENT_KINDS, assignments=assignments, workers=workers)
+                           kinds=PAYMENT_KINDS, assignments=assignments, workers=workers, refunds=refunds)
 
 
 @app.route("/bookings/<int:booking_id>/invoice")
@@ -541,8 +553,22 @@ def booking_status(booking_id):
     status = request.form.get("status")
     if status in STATUSES:
         db = get_db()
+        db.execute("BEGIN IMMEDIATE")
+        current = db.execute("SELECT status FROM bookings WHERE id=?", (booking_id,)).fetchone()
+        if not current:
+            abort(404)
+        outstanding = db.execute(
+            "SELECT COALESCE(SUM(dispatched_qty-returned_qty),0) FROM booking_items WHERE booking_id=?",
+            (booking_id,)).fetchone()[0]
+        if (status in ("Delivered", "Returned") or
+                (status in ("Booked", "Cancelled") and outstanding) or
+                (status == "WorkDone" and current["status"] not in ("Delivered", "WorkDone")) or
+                (current["status"] in ("Returned", "Cancelled") and status != current["status"])):
+            db.rollback()
+            flash(_("Use delivery and return tracking; outstanding items must be returned before closing."), "error")
+            return redirect(url_for("booking_view", booking_id=booking_id))
         db.execute("UPDATE bookings SET status = ? WHERE id = ?", (status, booking_id))
-        db.commit()
+        commit_changes(db)
         flash(_("Booking updated."), "ok")
         if status == "Returned":
             flash(_("Items back? Report any damaged or lost items below."), "ok")
@@ -558,41 +584,33 @@ def booking_cancel_fee(booking_id):
     else:
         db = get_db()
         db.execute("UPDATE bookings SET cancel_fee = ? WHERE id = ? AND status = 'Cancelled'", (fee, booking_id))
-        db.commit()
+        commit_changes(db)
         flash(_("Cancellation fee saved."), "ok")
     return redirect(url_for("booking_view", booking_id=booking_id))
 
 
 @app.route("/bookings/<int:booking_id>/payment", methods=["POST"])
 def booking_payment(booking_id):
-    try:
-        amount = float(request.form["amount"])
-        if amount <= 0:
-            raise ValueError
-    except (KeyError, ValueError):
-        flash(_("Enter a valid amount."), "error")
-        return redirect(url_for("booking_view", booking_id=booking_id))
-    kind = request.form.get("kind")
-    if kind not in PAYMENT_KINDS:
-        kind = "Payment"
-    db = get_db()
-    db.execute(
-        "INSERT INTO payments (booking_id, amount, kind, paid_on) VALUES (?,?,?,?)",
-        (booking_id, amount, kind, date.today().isoformat()),
-    )
-    db.commit()
-    flash(_("Payment recorded."), "ok")
-    return redirect(url_for("booking_view", booking_id=booking_id))
+    return record_payment(booking_id)
 
 
 @app.route("/bookings/<int:booking_id>/delete", methods=["POST"])
 def booking_delete(booking_id):
     db = get_db()
+    db.execute("BEGIN IMMEDIATE")
+    if db.execute("SELECT 1 FROM booking_items WHERE booking_id=? AND dispatched_qty>0",
+                  (booking_id,)).fetchone():
+        db.rollback()
+        flash(_("Dispatched bookings cannot be deleted; keep their delivery and return history."), "error")
+        return redirect(url_for("booking_view", booking_id=booking_id))
     if db.execute("SELECT 1 FROM payments WHERE booking_id = ?", (booking_id,)).fetchone():
         flash(_("This booking has payments, so it cannot be deleted. Cancel it instead."), "error")
         return redirect(url_for("booking_view", booking_id=booking_id))
+    if db.execute("SELECT 1 FROM refund_requests WHERE booking_id=?", (booking_id,)).fetchone():
+        flash(_("This booking has refund requests and cannot be deleted."), "error")
+        return redirect(url_for("booking_view", booking_id=booking_id))
     db.execute("DELETE FROM bookings WHERE id = ?", (booking_id,))
-    db.commit()
+    commit_changes(db)
     flash(_("Booking deleted."), "ok")
     return redirect(url_for("bookings"))
 

@@ -11,7 +11,7 @@ from flask import (Blueprint, abort, flash, g, redirect, render_template, reques
 from markupsafe import Markup
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from db import get_db
+from db import commit_changes, get_db
 from i18n import _
 
 accounts_bp = Blueprint("accounts", __name__)
@@ -21,17 +21,22 @@ DUMMY_PASSWORD_HASH = generate_password_hash(secrets.token_urlsafe(32))
 READ_ENDPOINTS = {
     "dashboard", "bookings", "booking_view", "invoice", "customers", "items",
     "stock.stock", "stock.damages", "staff.staff_list", "staff.staff_view",
-    "staff.attendance", "staff.attendance_history", "expenses", "finance",
+    "staff.attendance", "staff.attendance_history", "expenses", "finance", "operations.receipt",
+    "operations.ledger", "operations.daily",
 }
 AGENT_ENDPOINTS = {
-    "bookings", "booking_view", "invoice", "booking_new", "booking_status",
+    "bookings", "booking_view", "booking_new", "booking_status",
     "customers", "customer_new", "stock.stock", "stock.damages", "items",
+    "operations.movement",
+    "operations.daily",
 }
 ACCOUNTS_ENDPOINTS = {
     "finance", "expenses", "expense_new", "expense_delete", "bookings",
     "booking_view", "invoice", "booking_payment", "booking_cancel_fee",
     "customers", "stock.stock", "items", "staff.staff_list", "staff.staff_view",
     "staff.staff_pay", "staff.staff_pay_delete",
+    "operations.receipt",
+    "operations.ledger", "operations.daily",
 }
 
 
@@ -130,7 +135,7 @@ def install_accounts(app):
                 "INSERT INTO users (username,name,password_hash,role) VALUES (?,?,?,'Owner')",
                 (username.strip(), name.strip(), generate_password_hash(password)),
             )
-            get_db().commit()
+            commit_changes(get_db())
         except sqlite3.IntegrityError:
             get_db().rollback()
             raise click.ClickException("Username already exists.") from None
@@ -147,7 +152,7 @@ def install_accounts(app):
             "UPDATE users SET password_hash=?, session_version=session_version+1 WHERE username=?",
             (generate_password_hash(password), username.strip()),
         )
-        get_db().commit()
+        commit_changes(get_db())
         if not cur.rowcount:
             raise click.ClickException("Account not found.")
         click.echo("Password reset; existing sessions invalidated.")
@@ -169,7 +174,7 @@ def bootstrap_owner(app, username, password):
             "INSERT INTO users (username,name,password_hash,role) VALUES (?,?,?,'Owner')",
             (username.strip(), username.strip(), generate_password_hash(password)),
         )
-        db.commit()
+        commit_changes(db)
 
 
 def account_error(username, name, role, password):
@@ -203,7 +208,7 @@ def login():
                                          request.form.get("password", ""))
         if user and password_ok and user["active"]:
             db.execute("DELETE FROM login_attempts WHERE address=?", (address,))
-            db.commit()
+            commit_changes(db)
             session.clear()
             session.update(user_id=user["id"], session_version=user["session_version"])
             session.permanent = True
@@ -219,7 +224,7 @@ def login():
                started_at=CASE WHEN ?-started_at >= 900 THEN ? ELSE started_at END""",
             (address, now, now, now, now),
         )
-        db.commit()
+        commit_changes(db)
         flash(_("Wrong ID or password."), "error")
     return render_template("login.html")
 
@@ -241,7 +246,7 @@ def password():
         else:
             get_db().execute("UPDATE users SET password_hash=?, session_version=session_version+1 WHERE id=?",
                              (generate_password_hash(new), g.user["id"]))
-            get_db().commit()
+            commit_changes(get_db())
             session["session_version"] = g.user["session_version"] + 1
             flash(_("Password updated."), "ok")
             return redirect(url_for("more"))
@@ -289,7 +294,7 @@ def user_form(user_id=None):
                     else:
                         db.execute("INSERT INTO users (username,name,role,active,password_hash) VALUES (?,?,?,?,?)",
                                    (username, name, role, active, generate_password_hash(new_password)))
-                    db.commit()
+                    commit_changes(db)
                     if user_id == g.user["id"]:
                         session["session_version"] = current["session_version"] + 1
                     flash(_("Account saved."), "ok")
@@ -321,7 +326,7 @@ def work_update(assignment_id):
                            (status, assignment_id, g.user["id"]))
     if not cur.rowcount:
         abort(404)
-    get_db().commit()
+    commit_changes(get_db())
     flash(_("Work status updated."), "ok")
     return redirect(url_for("accounts.work"))
 
@@ -343,7 +348,7 @@ def assign(booking_id):
                ON CONFLICT(booking_id,user_id) DO UPDATE SET task=excluded.task, status='Assigned'""",
             (booking_id, worker["id"], task),
         )
-        db.commit()
+        commit_changes(db)
         flash(_("Work assigned."), "ok")
     return redirect(url_for("booking_view", booking_id=booking_id))
 
@@ -355,6 +360,6 @@ def unassign(assignment_id):
     if not row:
         abort(404)
     db.execute("DELETE FROM work_assignments WHERE id=?", (assignment_id,))
-    db.commit()
+    commit_changes(db)
     flash(_("Assignment removed."), "ok")
     return redirect(url_for("booking_view", booking_id=row["booking_id"]))
