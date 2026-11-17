@@ -17,6 +17,12 @@
   {% if b.notes %}<div class="muted mt">📝 {{ b.notes }}</div>{% endif %}
 </div>
 
+<div class="card row wrapflex">
+  <a class="btn light sm" href="{{ url_for('changes.history', booking_id=b.id) }}">{{ _('Booking change history') }}</a>
+  {% if can('changes.amend') and b.status not in ('Returned','Cancelled') %}<a class="btn light sm" href="{{ url_for('changes.amend', booking_id=b.id) }}">{{ _('Request amendment') }}</a>{% endif %}
+  {% if can('changes.settlement') and b.status != 'Cancelled' %}<a class="btn light sm" href="{{ url_for('changes.settlement', booking_id=b.id) }}">{{ _('Damage / loss settlement') }}</a>{% endif %}
+</div>
+
 {% if can('booking_status', 'POST') %}<div class="card">
   <div class="muted" style="margin-bottom:8px">{{ _('Update progress') }}</div>
   <p class="muted">{{ _('Use delivery and return quantities below to start work or complete a return.') }}</p>
@@ -35,7 +41,7 @@
 <div class="card">
   <h3>{{ _('Delivery and returns') }}</h3>
   {% for line in t.lines %}
-  <div class="mt"><strong>{{ line.name }}</strong><div class="muted">{{ _('Booked: {qty}; sent: {sent}; returned: {returned}; out: {out}', qty=line.qty, sent=line.dispatched_qty, returned=line.returned_qty, out=line.dispatched_qty-line.returned_qty) }}</div></div>
+  <div class="mt"><strong>{{ line.name }}</strong><div class="muted">{{ _('Booked: {qty}; sent: {sent}; returned: {returned}; lost: {lost}; out: {out}', qty=line.qty, sent=line.dispatched_qty, returned=line.returned_qty, lost=line.lost_qty, out=line.dispatched_qty-line.returned_qty-line.lost_qty) }}</div></div>
   {% endfor %}
   {% if can('operations.movement', 'POST') and b.status not in ('Returned', 'Cancelled') %}
   <form method="post" action="{{ url_for('operations.movement', booking_id=b.id) }}">
@@ -49,6 +55,7 @@
   </form>
   {% endif %}
 </div>
+{% if t.lost_qty %}<p class="muted">{{ _('Settlement includes {n} lost items. They were not physically returned.', n=t.lost_qty) }}</p>{% endif %}
 <div class="card">
   <table class="lines">
     <tr><th>{{ _('Item') }}</th><th class="num">{{ _('Qty') }}</th><th class="num">{{ _('Rent') }}</th></tr>

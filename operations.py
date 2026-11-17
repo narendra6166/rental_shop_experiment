@@ -35,7 +35,7 @@ def movement(booking_id):
             abort(400, description=_("Enter valid item quantities."))
         qty = int(raw)
         limit = (line["qty"] - line["dispatched_qty"] if kind == "dispatch"
-                 else line["dispatched_qty"] - line["returned_qty"])
+                 else line["dispatched_qty"] - line["returned_qty"] - line["lost_qty"])
         if qty > limit:
             abort(400, description=_("Quantity exceeds the items pending delivery or return."))
         if qty:
@@ -44,7 +44,7 @@ def movement(booking_id):
                 if qty > available_qty(db, item, booking["start_date"], booking["end_date"], booking_id):
                     abort(400, description=_("Not enough stock available for delivery."))
                 out = db.execute(
-                    "SELECT COALESCE(SUM(dispatched_qty-returned_qty),0) FROM booking_items WHERE item_id=?",
+                    "SELECT COALESCE(SUM(dispatched_qty-returned_qty-lost_qty),0) FROM booking_items WHERE item_id=?",
                     (line["item_id"],)).fetchone()[0]
                 damaged = db.execute(
                     "SELECT COALESCE(SUM(qty),0) FROM damages WHERE item_id=? AND status='Open'",
@@ -61,7 +61,7 @@ def movement(booking_id):
     for line, qty in chosen:
         db.execute(f"UPDATE booking_items SET {column}={column}+? WHERE id=?", (qty, line["id"]))
     remaining = db.execute(
-        "SELECT SUM(qty-returned_qty) FROM booking_items WHERE booking_id=?", (booking_id,)
+        "SELECT SUM(qty-returned_qty-lost_qty) FROM booking_items WHERE booking_id=?", (booking_id,)
     ).fetchone()[0]
     status = "Returned" if remaining == 0 else ("Delivered" if kind == "dispatch" else booking["status"])
     db.execute("UPDATE bookings SET status=? WHERE id=?", (status, booking_id))
@@ -201,7 +201,7 @@ def daily():
     bookings = db.execute(
         """SELECT b.*,c.name AS customer,c.phone,
                   SUM(bi.qty-bi.dispatched_qty) AS to_send,
-                  SUM(bi.dispatched_qty-bi.returned_qty) AS outstanding
+                  SUM(bi.dispatched_qty-bi.returned_qty-bi.lost_qty) AS outstanding
            FROM bookings b JOIN customers c ON c.id=b.customer_id
            JOIN booking_items bi ON bi.booking_id=b.id WHERE b.start_date<=?
            GROUP BY b.id ORDER BY b.start_date,b.id""", (day,)).fetchall()

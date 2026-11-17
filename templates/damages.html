@@ -15,7 +15,9 @@
   {% if d.note %}<div class="muted">📝 {{ d.note }}</div>{% endif %}
   {% if d.status == 'Open' and can('stock.damage_resolve', 'POST') %}
   <div class="row mt">
+    {% if d.kind != 'Lost' %}
     <form class="inline" method="post" action="{{ url_for('stock.damage_resolve', damage_id=d.id) }}">{{ csrf_input() }}<input type="hidden" name="action" value="repaired"><button class="btn green sm">🔧 {{ _('Repaired') }}</button></form>
+    {% endif %}
     <form class="inline" method="post" action="{{ url_for('stock.damage_resolve', damage_id=d.id) }}" onsubmit="return confirm({{ _('Write off? Total stock will reduce.')|tojson|forceescape }})">{{ csrf_input() }}<input type="hidden" name="action" value="writeoff"><button class="btn danger sm">{{ _('Write off') }}</button></form>
   </div>
   {% endif %}

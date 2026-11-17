@@ -19,6 +19,7 @@ from stock import stock_bp
 from validation import valid_phone
 from filters import date_window
 from operations import operations_bp, record_payment
+from booking_changes import changes_bp
 
 SHOP_NAME = os.environ.get("SHOP_NAME", "Ganesh Hyres")
 SHOP_ADDRESS = os.environ.get(
@@ -34,6 +35,7 @@ install_accounts(app)
 app.register_blueprint(staff_bp)
 app.register_blueprint(stock_bp)
 app.register_blueprint(operations_bp)
+app.register_blueprint(changes_bp)
 app.jinja_env.globals.update(salary_types=core.SALARY_TYPES, id_types=core.ID_TYPES,
                            item_categories=core.ITEM_CATEGORIES,
                            status_info=status_info, shop_name=SHOP_NAME, shop_address=SHOP_ADDRESS,
@@ -236,6 +238,8 @@ def items():
 @app.route("/items/<int:item_id>/edit", methods=["GET", "POST"])
 def item_form(item_id=None):
     db = get_db()
+    if request.method == "POST":
+        db.execute("BEGIN IMMEDIATE")
     item = db.execute("SELECT * FROM items WHERE id = ?", (item_id,)).fetchone() if item_id else None
     if item_id and not item:
         return redirect(url_for("items"))
@@ -257,10 +261,11 @@ def item_form(item_id=None):
             return render_template("item_form.html", item=request.form, item_id=item_id)
         if item_id:
             out_now = db.execute(
-                """SELECT COALESCE(SUM(bi.dispatched_qty-bi.returned_qty), 0) FROM booking_items bi JOIN bookings b ON b.id = bi.booking_id
+                """SELECT COALESCE(SUM(bi.dispatched_qty-bi.returned_qty-bi.lost_qty), 0) FROM booking_items bi JOIN bookings b ON b.id = bi.booking_id
                    WHERE bi.item_id = ? AND b.status IN ('Delivered', 'WorkDone')""", (item_id,)).fetchone()[0]
-            if data[2] < out_now:
-                flash(_("{n} units are out on rent, total cannot be less than that.", n=out_now), "error")
+            unavailable = out_now + core.damaged_open(db, item_id)
+            if data[2] < unavailable:
+                flash(_("Total stock cannot be less than {n} units already out or unavailable.", n=unavailable), "error")
                 return render_template("item_form.html", item=request.form, item_id=item_id)
             db.execute(
                 "UPDATE items SET name=?, category=?, total_qty=?, rate_per_day=?, deposit=? WHERE id=?",
@@ -394,7 +399,9 @@ def booking_new(booking_id=None):
         if not existing:
             return redirect(url_for("bookings"))
         if db.execute("SELECT 1 FROM booking_items WHERE booking_id=? AND dispatched_qty>0",
-                      (booking_id,)).fetchone():
+                      (booking_id,)).fetchone() or db.execute(
+                          "SELECT 1 FROM booking_change_requests WHERE booking_id=? AND status='Approved'",
+                          (booking_id,)).fetchone():
             flash(_("Items have been dispatched. Use delivery and return tracking instead of editing this booking."), "error")
             return redirect(url_for("booking_view", booking_id=booking_id))
     all_items = db.execute("SELECT * FROM items ORDER BY category, name").fetchall()
@@ -558,9 +565,12 @@ def booking_status(booking_id):
         if not current:
             abort(404)
         outstanding = db.execute(
-            "SELECT COALESCE(SUM(dispatched_qty-returned_qty),0) FROM booking_items WHERE booking_id=?",
+            "SELECT COALESCE(SUM(dispatched_qty-returned_qty-lost_qty),0) FROM booking_items WHERE booking_id=?",
             (booking_id,)).fetchone()[0]
+        dispatched = db.execute(
+            "SELECT 1 FROM booking_items WHERE booking_id=? AND dispatched_qty>0", (booking_id,)).fetchone()
         if (status in ("Delivered", "Returned") or
+                (status == "Cancelled" and dispatched) or
                 (status in ("Booked", "Cancelled") and outstanding) or
                 (status == "WorkDone" and current["status"] not in ("Delivered", "WorkDone")) or
                 (current["status"] in ("Returned", "Cancelled") and status != current["status"])):
@@ -609,6 +619,11 @@ def booking_delete(booking_id):
     if db.execute("SELECT 1 FROM refund_requests WHERE booking_id=?", (booking_id,)).fetchone():
         flash(_("This booking has refund requests and cannot be deleted."), "error")
         return redirect(url_for("booking_view", booking_id=booking_id))
+    if db.execute("SELECT 1 FROM booking_change_requests WHERE booking_id=?", (booking_id,)).fetchone():
+        flash(_("Bookings with change history cannot be deleted."), "error")
+        return redirect(url_for("booking_view", booking_id=booking_id))
+    g.activity_resource = {"booking_id": booking_id, "worker_ids": [
+        row["user_id"] for row in db.execute("SELECT user_id FROM work_assignments WHERE booking_id=?", (booking_id,))]}
     db.execute("DELETE FROM bookings WHERE id = ?", (booking_id,))
     commit_changes(db)
     flash(_("Booking deleted."), "ok")
@@ -617,6 +632,7 @@ def booking_delete(booking_id):
 
 @app.errorhandler(403)
 @app.errorhandler(400)
+@app.errorhandler(409)
 def request_error(error):
     return render_template("request_error.html", message=error.description), error.code
 

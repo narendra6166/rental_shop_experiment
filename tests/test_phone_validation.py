@@ -40,6 +40,8 @@ class PhoneValidationTests(unittest.TestCase):
         self.client = AuthenticatedClient(self.app, use_cookies=True)
         with self.app.app_context():
             db = self.db.get_db()
+            db.execute("DELETE FROM booking_change_requests")
+            db.execute("DELETE FROM damages")
             db.execute("DELETE FROM work_assignments")
             db.execute("DELETE FROM bookings")
             db.execute("DELETE FROM customers")

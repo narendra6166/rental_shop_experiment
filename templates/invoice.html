@@ -3,6 +3,7 @@
 {% block fab %}{% endblock %}
 {% block content %}
 <div class="card invoice">
+  {% if t.lost_qty %}<p>{{ _('Settlement includes {n} lost items. They were not physically returned.', n=t.lost_qty) }}</p>{% endif %}
   <div class="invoice-header">
     <div>
       <h2>{{ _(shop_name) }}</h2>

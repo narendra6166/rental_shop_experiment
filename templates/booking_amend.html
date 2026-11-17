@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}{{ _('Request amendment') }} · #{{ state.booking.id }}{% endblock %}
+{% block fab %}{% endblock %}
+{% block content %}
+<p class="muted">{{ _('Approval replaces the booking dates, quantities and quoted charges shown here. Rent is recalculated for the whole amended period, not split into separate periods.') }}</p>
+<form method="post">
+  {{ csrf_input() }}<input type="hidden" name="base" value="{{ base }}">
+  <div class="card grid2">
+    <div><label for="start_date">{{ _('Start date') }}</label><input id="start_date" name="start_date" type="date" value="{{ state.booking.start_date }}" required></div>
+    <div><label for="end_date">{{ _('End date') }}</label><input id="end_date" name="end_date" type="date" value="{{ state.booking.end_date }}" required></div>
+  </div>
+  {% for item in items %}
+  {% set previous = old.get(item.id) %}
+  <details class="item-category" {{ 'open' if previous }}>
+    <summary><strong>{{ _(item.name) }}</strong></summary>
+    <div class="card">
+      <label for="qty_{{ item.id }}">{{ _('Quantity') }}</label>
+      <input id="qty_{{ item.id }}" name="qty_{{ item.id }}" type="number" step="1" min="{{ previous.dispatched_qty if previous else 0 }}" max="999999999" value="{{ previous.qty if previous else 0 }}" required>
+      {% if previous %}<p class="muted">{{ _('Already dispatched: {n}', n=previous.dispatched_qty) }}</p>{% endif %}
+      {% if can_price %}
+      <div class="grid2">
+        <div><label for="rate_{{ item.id }}">{{ _('Rate / day') }}</label><input id="rate_{{ item.id }}" name="rate_{{ item.id }}" type="number" min="0" max="1000000000" step="0.01" value="{{ previous.rate if previous else item.rate_per_day }}" required></div>
+        <div><label for="deposit_{{ item.id }}">{{ _('Deposit / unit') }}</label><input id="deposit_{{ item.id }}" name="deposit_{{ item.id }}" type="number" min="0" max="1000000000" step="0.01" value="{{ previous.deposit if previous else item.deposit }}" required></div>
+      </div>
+      {% endif %}
+    </div>
+  </details>
+  {% endfor %}
+  <div class="card">
+    {% if can_price %}
+    {% for field, label in [('discount','Discount (₹)'),('travel_charge','Travel charges (₹)'),('labour_charge','Labour charges (₹)'),('damage_charge','Damage charges (₹)')] %}
+    <label for="{{ field }}">{{ _(label) }}</label><input id="{{ field }}" name="{{ field }}" type="number" min="0" max="1000000000" step="0.01" value="{{ state.booking[field] }}" required>
+    {% endfor %}
+    {% else %}<p class="muted">{{ _('Existing quoted prices are retained. New items use current inventory prices. Only Owner or Accounts can propose price changes.') }}</p>{% endif %}
+    <label for="reason">{{ _('Reason for change') }}</label><textarea id="reason" name="reason" rows="3" maxlength="1000" required></textarea>
+    <button class="btn block mt">{{ _('Submit for approval') }}</button>
+  </div>
+</form>
+{% endblock %}

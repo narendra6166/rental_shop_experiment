@@ -35,8 +35,10 @@ class AccountTests(unittest.TestCase):
         self.client = self.app.test_client()
         with self.app.app_context():
             db = self.db.get_db()
-            for table in ("activity_log", "refund_requests", "work_assignments", "bookings", "customers", "staff", "users", "login_attempts"):
+            for table in ("activity_log", "booking_change_requests", "refund_requests", "damages",
+                          "work_assignments", "bookings", "customers", "staff", "users", "login_attempts"):
                 db.execute(f"DELETE FROM {table}")
+            db.execute("UPDATE items SET total_qty=20 WHERE id=1")
             self.ids = {}
             for role in ("Owner", "Partner", "Agent", "Accounts", "Staff", "Worker"):
                 self.ids[role] = db.execute(
@@ -452,6 +454,271 @@ class AccountTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"booking_payment", response.data)
         self.assertNotIn(b"booking_payment", self.client.get("/activity?actor=nobody").data)
+
+    def change_form(self, path, **fields):
+        response = self.client.get(path)
+        self.assertEqual(response.status_code, 200)
+        base = re.search(rb'name="base" value="([^"]+)"', response.data).group(1).decode()
+        return {"base": base, "reason": "Customer agreed to change", **fields}
+
+    def latest_change(self):
+        with self.app.app_context():
+            return self.db.get_db().execute("SELECT id FROM booking_change_requests ORDER BY id DESC").fetchone()[0]
+
+    def test_agent_amendment_requires_accounts_approval_and_preserves_delivery_history(self):
+        self.as_role("Owner")
+        with self.app.app_context():
+            line_id = self.db.get_db().execute(
+                "SELECT id FROM booking_items WHERE booking_id=?", (self.booking_id,)).fetchone()[0]
+        self.post(f"/bookings/{self.booking_id}/movement", {"kind": "dispatch", f"move_{line_id}": "1"})
+        self.as_role("Agent")
+        path = f"/bookings/{self.booking_id}/amend"
+        data = self.change_form(path, start_date="2027-01-02", end_date="2027-01-03", qty_1="3")
+        self.assertEqual(self.post(path, data).status_code, 302)
+        change_id = self.latest_change()
+        with self.app.app_context():
+            line = self.db.get_db().execute("SELECT * FROM booking_items WHERE id=?", (line_id,)).fetchone()
+            self.assertEqual(line["qty"], 1)
+        self.assertEqual(self.post(f"/booking-changes/{change_id}/review", {"decision": "approve"}).status_code, 403)
+        self.as_role("Accounts")
+        self.assertEqual(self.post(f"/booking-changes/{change_id}/review", {"decision": "approve"}).status_code, 302)
+        with self.app.app_context():
+            db = self.db.get_db()
+            line = db.execute("SELECT * FROM booking_items WHERE id=?", (line_id,)).fetchone()
+            self.assertEqual((line["qty"], line["dispatched_qty"], line["rate"]), (3, 1, 100))
+            self.assertEqual(self.db.booking_totals(db, self.booking_id)["total"], 600)
+            change = db.execute("SELECT * FROM booking_change_requests WHERE id=?", (change_id,)).fetchone()
+            self.assertEqual((change["status"], change["requester_name"], change["reviewer_name"]),
+                             ("Approved", "Agent name", "Accounts name"))
+            self.assertIn('"qty": 1', change["before_snapshot"])
+            self.assertIn('"qty": 3', change["after_snapshot"])
+        self.assertEqual(self.post(f"/booking-changes/{change_id}/review", {"decision": "approve"}).status_code, 400)
+        self.assertIn(b"After approval", self.client.get(f"/bookings/{self.booking_id}/changes").data)
+
+    def test_amendment_preserves_original_quotes_and_records_approved_price_changes(self):
+        self.as_role("Owner")
+        path = f"/bookings/{self.booking_id}/amend"
+        data = self.change_form(path, start_date="2027-01-01", end_date="2027-01-01",
+                                qty_1="2", rate_1="120", deposit_1="25", travel_charge="10")
+        self.assertEqual(self.post(path, data).status_code, 302)
+        change_id = self.latest_change()
+        self.as_role("Accounts")
+        self.assertEqual(self.post(f"/booking-changes/{change_id}/review", {"decision": "approve"}).status_code, 302)
+        with self.app.app_context():
+            db = self.db.get_db()
+            self.assertEqual(self.db.booking_totals(db, self.booking_id)["total"], 300)
+            change = db.execute("SELECT * FROM booking_change_requests WHERE id=?", (change_id,)).fetchone()
+            self.assertIn('"rate": 100.0', change["before_snapshot"])
+            self.assertIn('"rate": 120.0', change["after_snapshot"])
+        self.as_role("Owner")
+        self.assertEqual(self.client.get(f"/bookings/{self.booking_id}/edit").status_code, 302)
+        self.assertIn(b"Bookings with change history", self.post(
+            f"/bookings/{self.booking_id}/delete", follow_redirects=True).data)
+
+    def test_stale_amendment_and_overbooking_approval_are_rejected(self):
+        self.as_role("Owner")
+        path = f"/bookings/{self.booking_id}/amend"
+        data = self.change_form(path, start_date="2027-01-01", end_date="2027-01-01", qty_1="10")
+        self.post(path, data)
+        change_id = self.latest_change()
+        with self.app.app_context():
+            db = self.db.get_db()
+            customer_id = db.execute("SELECT customer_id FROM bookings WHERE id=?", (self.booking_id,)).fetchone()[0]
+            other = db.execute(
+                """INSERT INTO bookings(customer_id,event_type,start_date,end_date,created_at)
+                   VALUES (?,'Other','2027-01-01','2027-01-01','2026-01-01')""", (customer_id,)).lastrowid
+            db.execute("INSERT INTO booking_items (booking_id,item_id,qty,rate) VALUES (?,1,15,100)", (other,))
+            db.commit()
+        self.assertEqual(self.post(f"/booking-changes/{change_id}/review", {"decision": "approve"}).status_code, 400)
+        with self.app.app_context():
+            db = self.db.get_db()
+            db.execute("UPDATE bookings SET notes='Another edit' WHERE id=?", (self.booking_id,))
+            db.commit()
+        self.assertEqual(self.post(path, data).status_code, 409)
+        self.assertEqual(self.post(f"/booking-changes/{change_id}/review", {"decision": "approve"}).status_code, 409)
+        self.assertEqual(self.post(f"/booking-changes/{change_id}/review", {"decision": "reject"}).status_code, 302)
+        with self.app.app_context():
+            self.assertEqual(self.db.get_db().execute(
+                "SELECT qty FROM booking_items WHERE booking_id=?", (self.booking_id,)).fetchone()[0], 1)
+
+    def test_losses_close_outstanding_items_without_faking_returns_or_restocking(self):
+        self.as_role("Owner")
+        with self.app.app_context():
+            db = self.db.get_db()
+            db.execute("UPDATE booking_items SET qty=5,deposit=10 WHERE booking_id=?", (self.booking_id,))
+            line_id = db.execute("SELECT id FROM booking_items WHERE booking_id=?", (self.booking_id,)).fetchone()[0]
+            db.commit()
+        movement = f"/bookings/{self.booking_id}/movement"
+        self.post(movement, {"kind": "dispatch", f"move_{line_id}": "5"})
+        self.as_role("Agent")
+        path = f"/bookings/{self.booking_id}/settlement"
+        self.post(path, self.change_form(path, line_id=str(line_id), qty="2", kind="Lost", charge="150"))
+        change_id = self.latest_change()
+        with self.app.app_context():
+            self.assertEqual(self.db.get_db().execute("SELECT COUNT(*) FROM damages").fetchone()[0], 0)
+        self.as_role("Accounts")
+        self.assertEqual(self.post(f"/booking-changes/{change_id}/review",
+                                   {"decision": "approve", "charge": "200"}).status_code, 302)
+        with self.app.app_context():
+            db = self.db.get_db()
+            line = db.execute("SELECT * FROM booking_items WHERE id=?", (line_id,)).fetchone()
+            self.assertEqual((line["returned_qty"], line["lost_qty"]), (0, 2))
+            self.assertEqual(self.db.booking_totals(db, self.booking_id)["total"], 750)
+            self.assertEqual(self.db.available_qty(db, db.execute("SELECT * FROM items WHERE id=1").fetchone(),
+                                                   "2027-01-01", "2027-01-01"), 15)
+            damage_id = db.execute("SELECT id FROM damages").fetchone()[0]
+        self.assertEqual(self.post(f"/damages/{damage_id}/resolve", {"action": "repaired"}).status_code, 400)
+        self.assertEqual(self.post(f"/damages/{damage_id}/resolve", {"action": "writeoff"}).status_code, 302)
+        self.as_role("Owner")
+        self.assertEqual(self.post(movement, {"kind": "return", f"move_{line_id}": "4"}).status_code, 400)
+        self.post(movement, {"kind": "return", f"move_{line_id}": "3"})
+        with self.app.app_context():
+            db = self.db.get_db()
+            line = db.execute("SELECT * FROM booking_items WHERE id=?", (line_id,)).fetchone()
+            self.assertEqual((line["returned_qty"], line["lost_qty"]), (3, 2))
+            self.assertEqual(db.execute("SELECT status FROM bookings WHERE id=?", (self.booking_id,)).fetchone()[0], "Returned")
+            self.assertEqual(self.db.booking_totals(db, self.booking_id)["total"], 700)
+            self.assertEqual(db.execute("SELECT total_qty FROM items WHERE id=1").fetchone()[0], 18)
+            self.assertEqual(self.db.available_qty(db, db.execute("SELECT * FROM items WHERE id=1").fetchone(),
+                                                   "2027-01-01", "2027-01-01"), 18)
+        self.assertIn(b"not physically returned", self.client.get(f"/bookings/{self.booking_id}/invoice").data)
+
+    def test_damaged_return_and_later_inspection_do_not_double_receive_items(self):
+        self.as_role("Owner")
+        with self.app.app_context():
+            db = self.db.get_db()
+            db.execute("UPDATE booking_items SET qty=2 WHERE booking_id=?", (self.booking_id,))
+            line_id = db.execute("SELECT id FROM booking_items WHERE booking_id=?", (self.booking_id,)).fetchone()[0]
+            db.commit()
+        movement = f"/bookings/{self.booking_id}/movement"
+        self.post(movement, {"kind": "dispatch", f"move_{line_id}": "2"})
+        path = f"/bookings/{self.booking_id}/settlement"
+        for kind in ("Damaged return", "Already returned damaged"):
+            if kind == "Already returned damaged":
+                self.post(movement, {"kind": "return", f"move_{line_id}": "1"})
+            data = self.change_form(path, line_id=str(line_id), qty="1", kind=kind, charge="10")
+            self.assertEqual(self.post(path, data).status_code, 302)
+            self.assertEqual(self.post(f"/booking-changes/{self.latest_change()}/review",
+                                       {"decision": "approve"}).status_code, 302)
+        with self.app.app_context():
+            db = self.db.get_db()
+            line = db.execute("SELECT * FROM booking_items WHERE id=?", (line_id,)).fetchone()
+            self.assertEqual((line["returned_qty"], line["lost_qty"]), (2, 0))
+            self.assertEqual(self.db.damaged_open(db, 1), 2)
+            damage_id = db.execute("SELECT id FROM damages ORDER BY id LIMIT 1").fetchone()[0]
+        self.assertEqual(self.post(path, self.change_form(path, line_id=str(line_id), qty="1",
+                              kind="Already returned damaged", charge="0")).status_code, 400)
+        self.post(f"/damages/{damage_id}/resolve", {"action": "repaired"})
+        with self.app.app_context():
+            self.assertEqual(self.db.damaged_open(self.db.get_db(), 1), 1)
+        self.assertEqual(self.post(path, self.change_form(path, line_id=str(line_id), qty="1",
+                              kind="Already returned damaged", charge="0")).status_code, 400)
+
+    def test_amendment_permissions_validation_and_price_tampering(self):
+        path = f"/bookings/{self.booking_id}/amend"
+        for role in ("Worker", "Staff", "Partner"):
+            self.as_role(role)
+            self.assertEqual(self.client.get(path).status_code, 403)
+            self.assertEqual(self.post(f"/booking-changes/999/review", {"decision": "approve"}).status_code, 403)
+        self.as_role("Agent")
+        data = self.change_form(path, start_date="2027-01-01", end_date="2027-01-01", qty_1="1")
+        self.assertEqual(self.post(path, {**data, "rate_1": "1"}).status_code, 403)
+        self.assertEqual(self.post(path, {**data, "discount": "1"}).status_code, 403)
+        self.assertEqual(self.post(path, {**data, "qty_1": "-1"}).status_code, 400)
+        self.assertEqual(self.post(path, {**data, "reason": ""}).status_code, 400)
+        self.assertEqual(self.post(path, {**data, "end_date": "2026-01-01"}).status_code, 400)
+        self.as_role("Owner")
+        self.assertEqual(self.post(path, {**data, "rate_1": "nan"}).status_code, 400)
+        self.assertEqual(self.post(path, {**data, "deposit_1": "inf"}).status_code, 400)
+
+    def test_live_updates_are_scoped_and_do_not_extend_inactive_sessions(self):
+        self.as_role("Worker")
+        first = self.client.get("/live")
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(set(first.json), {"revision"})
+        self.assertNotIn("Set-Cookie", first.headers)
+        worker_revision = first.json["revision"]
+        self.as_role("Owner")
+        owner_revision = self.client.get("/live").json["revision"]
+        self.post(f"/bookings/{self.booking_id}/payment", {"amount": "5"})
+        self.assertNotEqual(self.client.get("/live").json["revision"], owner_revision)
+        self.as_role("Worker")
+        self.assertEqual(self.client.get("/live").json["revision"], worker_revision)
+        self.as_role("Owner")
+        self.post(f"/bookings/{self.booking_id}/assign", {"user_id": self.ids["Worker"], "task": "Collect chairs"})
+        self.as_role("Worker")
+        assigned_revision = self.client.get("/live").json["revision"]
+        self.assertNotEqual(assigned_revision, worker_revision)
+        self.as_role("Owner")
+        with self.app.app_context():
+            assignment_id = self.db.get_db().execute("SELECT id FROM work_assignments").fetchone()[0]
+        self.post(f"/work/{assignment_id}/remove")
+        self.as_role("Worker")
+        self.assertNotEqual(self.client.get("/live").json["revision"], assigned_revision)
+        with self.app.app_context():
+            db = self.db.get_db()
+            db.execute("UPDATE users SET active=0 WHERE id=?", (self.ids["Worker"],))
+            db.commit()
+        self.assertEqual(self.client.get("/live").status_code, 302)
+
+    def test_amendment_cannot_reduce_dispatched_quantities_but_can_remove_unsent_remainder(self):
+        self.as_role("Owner")
+        with self.app.app_context():
+            db = self.db.get_db()
+            db.execute("UPDATE booking_items SET qty=3,deposit=10 WHERE booking_id=?", (self.booking_id,))
+            line_id = db.execute("SELECT id FROM booking_items WHERE booking_id=?", (self.booking_id,)).fetchone()[0]
+            db.commit()
+        movement = f"/bookings/{self.booking_id}/movement"
+        self.post(movement, {"kind": "dispatch", f"move_{line_id}": "2"})
+        self.post(movement, {"kind": "return", f"move_{line_id}": "2"})
+        self.assertIn(b"Use delivery and return tracking", self.post(
+            f"/bookings/{self.booking_id}/status", {"status": "Cancelled"}, follow_redirects=True).data)
+        path = f"/bookings/{self.booking_id}/amend"
+        data = self.change_form(path, start_date="2027-01-01", end_date="2027-01-01", qty_1="1")
+        self.assertEqual(self.post(path, data).status_code, 400)
+        self.assertEqual(self.post(path, {**data, "qty_1": "2"}).status_code, 302)
+        self.assertEqual(self.post(f"/booking-changes/{self.latest_change()}/review",
+                                   {"decision": "approve"}).status_code, 302)
+        with self.app.app_context():
+            db = self.db.get_db()
+            self.assertEqual(db.execute("SELECT status FROM bookings WHERE id=?", (self.booking_id,)).fetchone()[0], "Returned")
+            self.assertEqual(self.db.booking_totals(db, self.booking_id)["total"], 200)
+
+    def test_competing_loss_requests_cannot_settle_the_same_items_twice(self):
+        self.as_role("Owner")
+        with self.app.app_context():
+            line_id = self.db.get_db().execute(
+                "SELECT id FROM booking_items WHERE booking_id=?", (self.booking_id,)).fetchone()[0]
+        self.post(f"/bookings/{self.booking_id}/movement", {"kind": "dispatch", f"move_{line_id}": "1"})
+        path = f"/bookings/{self.booking_id}/settlement"
+        data = self.change_form(path, line_id=str(line_id), qty="1", kind="Lost", charge="20")
+        self.post(path, data)
+        first = self.latest_change()
+        self.post(path, data)
+        second = self.latest_change()
+        self.assertEqual(self.post(f"/booking-changes/{first}/review", {"decision": "approve"}).status_code, 302)
+        self.assertEqual(self.post(f"/booking-changes/{second}/review", {"decision": "approve"}).status_code, 409)
+        with self.app.app_context():
+            db = self.db.get_db()
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM damages").fetchone()[0], 1)
+            self.assertEqual(db.execute("SELECT lost_qty FROM booking_items WHERE id=?", (line_id,)).fetchone()[0], 1)
+
+    def test_agent_history_hides_financial_snapshots_and_payment_live_events(self):
+        self.as_role("Owner")
+        path = f"/bookings/{self.booking_id}/amend"
+        data = self.change_form(path, start_date="2027-01-01", end_date="2027-01-01",
+                                qty_1="2", rate_1="314159.26")
+        self.post(path, data)
+        self.as_role("Agent")
+        self.assertNotIn(b"314159", self.client.get(f"/bookings/{self.booking_id}/changes").data)
+        revision = self.client.get("/live").json["revision"]
+        self.as_role("Owner")
+        self.post(f"/bookings/{self.booking_id}/payment", {"amount": "5"})
+        self.as_role("Agent")
+        self.assertEqual(self.client.get("/live").json["revision"], revision)
+        with self.client.session_transaction() as session:
+            session.clear()
+        self.assertEqual(self.client.get("/live").status_code, 302)
 
 
 if __name__ == "__main__":

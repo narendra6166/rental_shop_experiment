@@ -6,7 +6,7 @@
 <div class="card"><strong>{{ current_user.name }}</strong><div class="muted">{{ current_user.username }} · {{ _(current_user.role) }}</div></div>
 <a class="card row between" href="{{ url_for('language') }}"><strong>🌐 {{ _('Language') }}</strong><span>›</span></a>
 {% for endpoint, label in [
-  ('operations.daily', 'Daily operations'), ('accounts.users', 'Team accounts'), ('operations.activity', 'Activity history'), ('items', 'Inventory & prices'), ('customers', 'Customers'),
+  ('operations.daily', 'Daily operations'), ('changes.queue', 'Booking change requests'), ('accounts.users', 'Team accounts'), ('operations.activity', 'Activity history'), ('items', 'Inventory & prices'), ('customers', 'Customers'),
   ('stock.damages', 'Damaged & lost items'), ('staff.attendance', 'Attendance'),
   ('staff.staff_list', 'Staff & salaries'), ('expenses', 'Expenses'), ('finance', 'Finance report'),
   ('backup', 'Download backup'), ('accounts.password', 'Change password')] %}

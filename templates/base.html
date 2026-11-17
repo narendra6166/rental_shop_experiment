@@ -7,6 +7,7 @@
 <title>{% block page_title %}{{ _(shop_name) }}{% endblock %}</title>
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 <script src="{{ url_for('static', filename='forms.js') }}" defer></script>
+{% if live_enabled %}<script src="{{ url_for('static', filename='live.js') }}" defer></script>{% endif %}
 </head>
 <body>
 {% set ep = request.endpoint or '' %}
@@ -21,6 +22,16 @@
 </div></header>
 {% endblock %}
 <main class="wrap">
+  {% if live_enabled %}
+  <div id="live-updates" class="flash noprint" role="status" aria-live="polite" hidden
+       data-url="{{ url_for('accounts.live') }}" data-revision="{{ current_user.live_revision }}"
+       data-changed="{{ _('New team updates are available. Your unfinished form is preserved.') }}"
+       data-offline="{{ _('Live updates disconnected. Retrying; displayed information may be outdated.') }}"
+       data-session="{{ _('Your session changed or expired. Reload to sign in again.') }}"
+       data-confirm="{{ _('Reload and discard unfinished changes?') }}">
+    <span data-live-message></span><button class="btn light sm mt" type="button" hidden>{{ _('Reload when ready') }}</button>
+  </div>
+  {% endif %}
   {% for category, msg in get_flashed_messages(with_categories=true) %}
     <div class="flash {{ category }}">{{ msg }}</div>
   {% endfor %}

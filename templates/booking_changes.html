@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}{{ _('Booking change history') }} · #{{ state.booking.id }}{% endblock %}
+{% block fab %}{% endblock %}
+{% macro show_state(value) %}
+  <div class="muted">{{ value.booking.start_date|dmy('%d %b %Y') }} → {{ value.booking.end_date|dmy('%d %b %Y') }}</div>
+  {% for line in value.lines %}
+  <div class="mt">{{ _(line.name) }} × {{ line.qty }}
+    <div class="muted">{{ _('Sent: {sent}; returned: {returned}; lost: {lost}', sent=line.dispatched_qty, returned=line.returned_qty, lost=line.lost_qty) }}</div>
+    {% if can('invoice') %}<div class="muted">{{ _('Rate / day') }}: {{ line.rate|money }} · {{ _('Deposit / unit') }}: {{ line.deposit|money }}</div>{% endif %}
+  </div>
+  {% endfor %}
+  {% if can('invoice') %}
+  {% for key, label in [('discount','Discount'),('travel_charge','Travel charges'),('labour_charge','Labour charges'),('damage_charge','Damage charges')] %}
+  <div class="muted">{{ _(label) }}: {{ value.booking[key]|money }}</div>
+  {% endfor %}
+  {% for damage in value.damages %}<div class="muted">{{ _(damage.kind) }} · {{ _(damage.name) }} × {{ damage.qty }} · {{ damage.charge|money }}</div>{% endfor %}
+  {% endif %}
+{% endmacro %}
+{% block content %}
+<div class="row wrapflex">
+  <a class="btn light" href="{{ url_for('booking_view', booking_id=state.booking.id) }}">{{ _('Booking') }}</a>
+  {% if can('changes.amend') and state.booking.status not in ('Returned','Cancelled') %}<a class="btn light" href="{{ url_for('changes.amend', booking_id=state.booking.id) }}">{{ _('Request amendment') }}</a>{% endif %}
+  {% if can('changes.settlement') and state.booking.status != 'Cancelled' %}<a class="btn light" href="{{ url_for('changes.settlement', booking_id=state.booking.id) }}">{{ _('Damage / loss settlement') }}</a>{% endif %}
+</div>
+{% for change in changes %}
+<div class="card mt change-card">
+  <h3>#{{ change.id }} · {{ _(change.kind) }} · {{ _(change.status) }}</h3>
+  <p class="muted">{{ _('Requested by') }} {{ change.requester_name }} · {{ change.created_at }}</p>
+  <p>{{ change.reason }}</p>
+  <details><summary>{{ _('Before change') }}</summary>{{ show_state(change.before) }}</details>
+  <details class="mt"><summary>{{ _('Proposed change') }}</summary>
+  {% if change.kind == 'Amendment' %}
+    <div class="muted">{{ change.proposed.start_date|dmy('%d %b %Y') }} → {{ change.proposed.end_date|dmy('%d %b %Y') }}</div>
+    {% for line in change.proposed.lines %}
+    <div class="mt">{{ _(line.name) }} × {{ line.qty }}
+    {% if can('invoice') %}<div class="muted">{{ _('Rate / day') }}: {{ line.rate|money }} · {{ _('Deposit / unit') }}: {{ line.deposit|money }}</div>{% endif %}</div>
+    {% endfor %}
+    {% if can('invoice') %}
+    {% for key,label in [('discount','Discount'),('travel_charge','Travel charges'),('labour_charge','Labour charges'),('damage_charge','Damage charges')] %}
+    <div class="muted">{{ _(label) }}: {{ change.proposed[key]|money }}</div>{% endfor %}
+    {% endif %}
+  {% else %}
+    {% for line in change.before.lines %}{% if line.id == change.proposed.line_id %}<p>{{ _(line.name) }} × {{ change.proposed.qty }}</p>{% endif %}{% endfor %}
+    {% if can('invoice') %}<p>{{ _('Proposed total charge (₹)') }}: {{ change.proposed.charge|money }}</p>{% endif %}
+  {% endif %}
+  </details>
+  {% if change.after %}<details class="mt"><summary>{{ _('After approval') }}</summary>{{ show_state(change.after) }}</details>{% endif %}
+  {% if change.reviewed_at %}<p class="muted">{{ _('Reviewed by') }} {{ change.reviewer_name }} · {{ change.reviewed_at }}</p>{% endif %}
+  {% if change.status == 'Pending' and can('changes.review','POST') %}
+  <form method="post" action="{{ url_for('changes.review', change_id=change.id) }}" class="mt">
+    {{ csrf_input() }}
+    {% if change.kind != 'Amendment' %}<label for="charge_{{ change.id }}">{{ _('Final total charge (₹)') }}</label><input id="charge_{{ change.id }}" name="charge" type="number" min="0" max="1000000000" step="0.01" value="{{ change.proposed.charge }}" required>{% endif %}
+    <p class="muted">{{ _('Approval applies this change immediately. Verify the customer agreement and quantities first.') }}</p>
+    <div class="row wrapflex"><button class="btn" name="decision" value="approve">{{ _('Approve change') }}</button><button class="btn danger" name="decision" value="reject" formnovalidate>{{ _('Reject') }}</button></div>
+  </form>
+  {% endif %}
+</div>
+{% else %}<div class="card mt muted">{{ _('No change requests yet.') }}</div>{% endfor %}
+{% endblock %}

@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}{{ _('Damage / loss settlement') }} · #{{ state.booking.id }}{% endblock %}
+{% block fab %}{% endblock %}
+{% block content %}
+<p class="muted">{{ _('Damaged return receives items into repair stock. Lost records missing items without marking them returned. Already returned damaged flags items previously received.') }}</p>
+<p class="muted">{{ _('Do not submit a second settlement for damage or loss already recorded before this upgrade.') }}</p>
+<form method="post" class="card">
+  {{ csrf_input() }}<input type="hidden" name="base" value="{{ base }}">
+  <label for="line_id">{{ _('Item') }}</label><select id="line_id" name="line_id" required>
+  {% for line in state.lines %}<option value="{{ line.id }}">{{ _(line.name) }} · {{ _('Out: {n}', n=line.dispatched_qty-line.returned_qty-line.lost_qty) }} · {{ _('Returned: {n}', n=line.returned_qty) }}</option>{% endfor %}
+  </select>
+  <label for="kind">{{ _('Settlement type') }}</label><select id="kind" name="kind">{% for kind in kinds %}<option value="{{ kind }}">{{ _(kind) }}</option>{% endfor %}</select>
+  <label for="qty">{{ _('Quantity') }}</label><input id="qty" name="qty" type="number" min="1" max="999999999" step="1" required>
+  <label for="charge">{{ _('Proposed total charge (₹)') }}</label><input id="charge" name="charge" type="number" min="0" max="1000000000" step="0.01" value="0" required>
+  <label for="reason">{{ _('Reason for change') }}</label><textarea id="reason" name="reason" rows="3" maxlength="1000" required></textarea>
+  <p class="muted">{{ _('Owner or Accounts must review the quantities and final charge before stock and the bill change.') }}</p>
+  <button class="btn block mt">{{ _('Submit for approval') }}</button>
+</form>
+{% endblock %}

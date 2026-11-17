@@ -47,7 +47,7 @@ The last active Owner cannot be disabled or demoted.
 | Owner | All business data, account management, backups, inventory, attendance and work assignment |
 | Partner | Read-only business operations, payroll and finance reports; no accounts or backups |
 | Agent | Customers, bookings, delivery/returns and booking status; read stock; no bills, payments, payroll, expenses or finance reports |
-| Accounts | Read bookings and customers; record payments, cancellation fees, expenses and salary payments; view reports |
+| Accounts | Read bookings and customers; record payments, cancellation fees, expenses and salary payments; approve booking amendments and damage/loss settlements; view reports |
 | Staff / Worker | Their assigned work and customer contact/location for those jobs only; update their task status |
 
 On a booking, Owners assign a task to an active Staff/Worker login. The assignee sees it under My work.
@@ -67,13 +67,68 @@ Staff/Worker logins continue to see only their own assigned work.
 On a booking, use Delivery and returns to record quantities sent or received for each item.
 For example, returning 80 of 100 dispatched chairs leaves 20 outstanding.
 Returned quantities immediately stop reserving stock. The deposit remains on the bill until
-all booked quantities are returned; partial returns do not prorate rent or deposits.
+all booked quantities are returned or approved as lost; partial returns do not prorate rent or deposits.
 Previously Delivered/WorkDone bookings are migrated as fully dispatched, and Returned bookings
 as fully dispatched and returned. This initialization runs only once.
-Bookings with dispatched items cannot be edited or deleted; they retain their movement history.
+Bookings with dispatched items cannot be directly edited or deleted; use an approved amendment instead.
 Delivery/return quantities, not manual status changes, set Delivered and Returned.
-If only part of an order was supplied, return those items and cancel the remaining order;
-the cancellation fee must reflect the agreed final charge.
+If only part of an order was supplied, return those items and request an amendment removing
+the unsent remainder. Approval closes the booking if all remaining quantities are accounted for.
+
+### Amendments and damage/loss approvals
+
+On a booking, Request amendment proposes new dates, item quantities, daily rates, per-unit deposits,
+discounts or additional charges. A reason is required. Existing quoted rates are prefilled, not replaced
+by current inventory prices. New items default to their current inventory prices.
+Agent requests retain existing quotes and cannot change prices; Owner and Accounts can propose prices.
+Only Owner or Accounts can approve or reject requests, including their own requests.
+No proposed change affects stock or the bill before approval.
+Approval rechecks availability under a write lock, preserves delivery/return/loss counts and line IDs,
+and prevents reducing quantities below the quantity already dispatched.
+Rent is recalculated across the entire amended rental period at the approved rates; this is not
+time-sliced billing. Confirm the full revised charge with the customer before approving.
+
+Booking change history keeps the submitted before-state, proposal, reason, requester, reviewer,
+review time and approved after-state. Approval refuses stale requests after the booking changes;
+reject the stale request and submit a fresh one. More > Booking change requests lists pending work.
+History begins with the first request after this upgrade, not earlier edits. Bookings with change
+history cannot be deleted. Once an amendment is approved, subsequent edits also require amendments.
+Agent history excludes financial snapshots; Staff/Worker roles cannot access this history.
+These snapshots are application records, not tamper-proof external records or immutable issued invoices.
+
+Damage / loss settlement supports:
+- **Damaged return:** receives physically returned items and keeps them unavailable pending repair/write-off.
+- **Lost:** settles missing items without increasing the physical returned count.
+- **Already returned damaged:** flags damage found after receiving items; does not receive them twice.
+
+Agents can submit a proposed total damage/loss charge; Owner or Accounts reviews the quantities and
+sets the final total charge on approval. The approved charge becomes part of the booking bill.
+Approval accounts for losses separately, releases their reservation, and keeps those units unavailable.
+Lost items can be written off (reducing total stock), but cannot be marked repaired.
+Damaged items return to available stock only after repair; writing them off reduces total stock instead.
+Neither writing off nor repairing a record removes the approved customer charge.
+The booking closes when all booked units are returned or approved lost, releasing the deposit charge
+from the bill; any actual customer refund still follows the separate Owner-only refund approval flow.
+Legacy damage records are preserved and are not automatically reconciled against dispatch counts.
+Do not submit duplicate settlements for damage/loss already charged before this upgrade.
+Use the general Damaged & lost page for warehouse stock; customer booking cases use settlement requests.
+
+### Live team updates
+
+Signed-in pages check for role-scoped change revisions about every five seconds while visible.
+Idle pages refresh after a relevant committed change. Focused controls and unfinished forms are
+not replaced: a localized banner offers Reload when ready, with confirmation before discarding edits.
+Connection failures are visible and retried. Polling pauses on hidden tabs and does not prolong the
+eight-hour login inactivity window. Worker notifications are limited to their assigned jobs.
+Language-only screens, password screens and printable invoices/receipts do not poll.
+All team devices must connect to the **same running server and database**. Separate Termux installs
+do not synchronize automatically. Polling is near-real-time, not offline editing or a push notification service.
+
+Regression checks:
+```
+python -W error::ResourceWarning -m unittest discover -s tests -v
+node --test tests/test_live_updates.js
+```
 
 Record payments as Cash, UPI or Bank; UPI/Bank require a reference. Cash advances can be entered
 while creating a booking; for other methods save the booking first, then add the payment.

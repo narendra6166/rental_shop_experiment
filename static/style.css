@@ -68,6 +68,9 @@ a.card:active { transform: scale(.99); }
 .customer-actions .btn { display: block; width: 100%; }
 .work-card { overflow-wrap: anywhere; }
 .activity-resource { overflow-wrap: anywhere; }
+.change-card { overflow-wrap: anywhere; }
+#live-updates { background: var(--primary-tint); color: var(--ink); }
+#live-updates[hidden], #live-updates button[hidden] { display: none; }
 
 /* Pills */
 .pill { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: .75rem; font-weight: 700;

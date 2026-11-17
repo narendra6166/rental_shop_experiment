@@ -6,7 +6,7 @@ from datetime import timedelta
 from urllib.parse import urlsplit
 
 import click
-from flask import (Blueprint, abort, flash, g, redirect, render_template, request,
+from flask import (Blueprint, abort, flash, g, jsonify, redirect, render_template, request,
                    session, url_for)
 from markupsafe import Markup
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -23,12 +23,14 @@ READ_ENDPOINTS = {
     "stock.stock", "stock.damages", "staff.staff_list", "staff.staff_view",
     "staff.attendance", "staff.attendance_history", "expenses", "finance", "operations.receipt",
     "operations.ledger", "operations.daily",
+    "changes.history", "changes.queue",
 }
 AGENT_ENDPOINTS = {
     "bookings", "booking_view", "booking_new", "booking_status",
     "customers", "customer_new", "stock.stock", "stock.damages", "items",
     "operations.movement",
     "operations.daily",
+    "changes.history", "changes.amend", "changes.settlement", "changes.queue",
 }
 ACCOUNTS_ENDPOINTS = {
     "finance", "expenses", "expense_new", "expense_delete", "bookings",
@@ -37,6 +39,8 @@ ACCOUNTS_ENDPOINTS = {
     "staff.staff_pay", "staff.staff_pay_delete",
     "operations.receipt",
     "operations.ledger", "operations.daily",
+    "changes.history", "changes.amend", "changes.settlement", "changes.review", "changes.queue",
+    "stock.damages", "stock.damage_new", "stock.damage_resolve",
 }
 
 
@@ -44,7 +48,7 @@ def allowed(endpoint, method="GET"):
     user = g.get("user")
     if not user:
         return False
-    if endpoint in {"more", "language", "accounts.password", "accounts.logout"}:
+    if endpoint in {"more", "language", "accounts.password", "accounts.logout", "accounts.live"}:
         return True
     if user["role"] == "Owner":
         return True
@@ -80,7 +84,7 @@ def landing():
 
 def install_accounts(app):
     app.register_blueprint(accounts_bp)
-    app.config.update(PERMANENT_SESSION_LIFETIME=timedelta(hours=8),
+    app.config.update(PERMANENT_SESSION_LIFETIME=timedelta(hours=8), SESSION_REFRESH_EACH_REQUEST=False,
                       SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE="Lax")
     app.jinja_env.globals.update(can=allowed, csrf_input=csrf_input, roles=ROLES)
 
@@ -99,6 +103,8 @@ def install_accounts(app):
         if not g.user and request.endpoint != "accounts.login":
             return redirect(url_for("accounts.login", next=request.full_path.rstrip("?")))
         if g.user and request.endpoint != "accounts.login":
+            if request.endpoint != "accounts.live":
+                session.modified = True
             if request.endpoint == "dashboard" and landing() != "dashboard":
                 return redirect(url_for(landing()))
             if not allowed(request.endpoint, request.method):
@@ -111,6 +117,11 @@ def install_accounts(app):
     @app.context_processor
     def account_context():
         return {"current_user": g.get("user")}
+
+    @app.context_processor
+    def live_context():
+        return {"live_enabled": bool(g.get("user")) and request.endpoint not in {
+            "language", "accounts.password", "accounts.login", "invoice", "operations.receipt"}}
 
     @app.after_request
     def private_responses(response):
@@ -326,6 +337,9 @@ def work_update(assignment_id):
                            (status, assignment_id, g.user["id"]))
     if not cur.rowcount:
         abort(404)
+    row = get_db().execute("SELECT booking_id FROM work_assignments WHERE id=?", (assignment_id,)).fetchone()
+    g.activity_resource = {"booking_id": row["booking_id"], "user_id": g.user["id"],
+                           "assignment_id": assignment_id}
     commit_changes(get_db())
     flash(_("Work status updated."), "ok")
     return redirect(url_for("accounts.work"))
@@ -348,6 +362,7 @@ def assign(booking_id):
                ON CONFLICT(booking_id,user_id) DO UPDATE SET task=excluded.task, status='Assigned'""",
             (booking_id, worker["id"], task),
         )
+        g.activity_resource = {"booking_id": booking_id, "user_id": worker["id"]}
         commit_changes(db)
         flash(_("Work assigned."), "ok")
     return redirect(url_for("booking_view", booking_id=booking_id))
@@ -356,10 +371,16 @@ def assign(booking_id):
 @accounts_bp.route("/work/<int:assignment_id>/remove", methods=["POST"])
 def unassign(assignment_id):
     db = get_db()
-    row = db.execute("SELECT booking_id FROM work_assignments WHERE id=?", (assignment_id,)).fetchone()
+    row = db.execute("SELECT booking_id,user_id FROM work_assignments WHERE id=?", (assignment_id,)).fetchone()
     if not row:
         abort(404)
     db.execute("DELETE FROM work_assignments WHERE id=?", (assignment_id,))
+    g.activity_resource = dict(row)
     commit_changes(db)
     flash(_("Assignment removed."), "ok")
     return redirect(url_for("booking_view", booking_id=row["booking_id"]))
+
+
+@accounts_bp.route("/live")
+def live():
+    return jsonify(revision=str(g.user["live_revision"]))

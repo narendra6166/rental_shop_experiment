@@ -13,11 +13,7 @@
     <div><label>{{ _('Quantity') }}</label><input type="number" inputmode="numeric" min="1" name="qty" required value="{{ form.get('qty', 1) }}"></div>
     <div><label>{{ _('Type') }}</label><select name="kind"><option value="Damaged">{{ _('Damaged') }}</option><option value="Lost" {{ 'selected' if form.get('kind') == 'Lost' }}>{{ _('Lost') }}</option></select></div>
   </div>
-  <label>{{ _('Booking (optional)') }}</label>
-  <select name="booking_id">
-    <option value="">{{ _('— none —') }}</option>
-    {% for b in bookings %}<option value="{{ b.id }}" {{ 'selected' if form.get('booking_id')|string == b.id|string }}>#{{ b.id }} · {{ b.name }} · {{ _(b.event_type) }}</option>{% endfor %}
-  </select>
+  <p class="muted">{{ _('For a customer booking, open that booking and use Damage / loss settlement instead.') }}</p>
   <label>{{ _('Charge to customer (₹)') }}</label>
   <input type="number" inputmode="decimal" min="0" step="0.01" name="charge" value="{{ form.get('charge', 0) }}">
   <label>{{ _('Note') }}</label><textarea name="note" rows="2" placeholder="{{ _('What happened?') }}">{{ form.get('note', '') }}</textarea>

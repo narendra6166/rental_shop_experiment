@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}{{ _('Booking change requests') }}{% endblock %}
+{% block fab %}{% endblock %}
+{% block content %}
+<div class="chips">
+<a class="chip {{ 'on' if show == 'pending' }}" href="{{ url_for('changes.queue') }}">{{ _('Pending') }}</a>
+<a class="chip {{ 'on' if show == 'all' }}" href="{{ url_for('changes.queue', show='all') }}">{{ _('History') }}</a>
+</div>
+{% for change in changes %}
+<a class="card change-card" href="{{ url_for('changes.history', booking_id=change.booking_id) }}">
+  <strong>#{{ change.id }} · {{ _('Booking #{n}', n=change.booking_id) }} · {{ _(change.kind) }}</strong>
+  <div>{{ change.customer }} · {{ _(change.status) }}</div><p>{{ change.reason }}</p>
+  <div class="muted">{{ change.requester_name }} · {{ change.created_at }}</div>
+</a>
+{% else %}<div class="card muted">{{ _('No change requests yet.') }}</div>{% endfor %}
+<div class="row between">
+{% if page > 1 %}<a class="btn light" href="{{ url_for('changes.queue', show=show, page=page-1) }}">{{ _('Previous') }}</a>{% endif %}
+<span>{{ _('Page {n}', n=page) }}</span>
+{% if has_next %}<a class="btn light" href="{{ url_for('changes.queue', show=show, page=page+1) }}">{{ _('Next') }}</a>{% endif %}
+</div>
+{% endblock %}

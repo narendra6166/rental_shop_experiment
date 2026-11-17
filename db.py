@@ -91,6 +91,22 @@ CREATE TABLE IF NOT EXISTS refund_requests (
     reviewed_by INTEGER REFERENCES users(id),
     created_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS booking_change_requests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    booking_id INTEGER NOT NULL REFERENCES bookings(id),
+    kind TEXT NOT NULL,
+    before_snapshot TEXT NOT NULL,
+    proposal TEXT NOT NULL,
+    reason TEXT NOT NULL,
+    requested_by INTEGER NOT NULL REFERENCES users(id),
+    requester_name TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'Pending',
+    reviewed_by INTEGER REFERENCES users(id),
+    reviewer_name TEXT,
+    reviewed_at TEXT,
+    after_snapshot TEXT
+);
 CREATE TABLE IF NOT EXISTS damages (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     item_id INTEGER NOT NULL REFERENCES items(id),
@@ -177,6 +193,7 @@ STOCK_PURCHASE = "New stock purchase"
 
 # Columns added after the first release; applied to existing databases on start-up.
 MIGRATIONS = {
+    "users": [("live_revision", "INTEGER NOT NULL DEFAULT 0")],
     "payments": [
         ("method", "TEXT NOT NULL DEFAULT 'Not recorded'"),
         ("reference", "TEXT NOT NULL DEFAULT ''"),
@@ -184,7 +201,9 @@ MIGRATIONS = {
     "booking_items": [
         ("dispatched_qty", "INTEGER NOT NULL DEFAULT 0"),
         ("returned_qty", "INTEGER NOT NULL DEFAULT 0"),
+        ("lost_qty", "INTEGER NOT NULL DEFAULT 0"),
     ],
+    "damages": [("booking_item_id", "INTEGER REFERENCES booking_items(id)")],
     "staff": [
         ("salary_type", "TEXT NOT NULL DEFAULT 'Monthly'"),
         ("address", "TEXT"),
@@ -234,6 +253,38 @@ def commit_changes(db):
              json.dumps(g.get("activity_resource", request.view_args or {}), sort_keys=True),
              datetime.now().isoformat(timespec="seconds")),
         )
+        action = request.endpoint or ""
+        if action not in {"accounts.login", "accounts.password"}:
+            roles = ("Owner", "Partner", "Agent", "Accounts")
+            if action.startswith("accounts.") and action not in {
+                    "accounts.assign", "accounts.unassign", "accounts.work_update"}:
+                roles = ("Owner",)
+            elif action in {"booking_payment", "booking_cancel_fee", "operations.review_refund",
+                            "expense_new", "expense_delete"}:
+                roles = ("Owner", "Partner", "Accounts")
+            elif action.startswith("staff."):
+                roles = ("Owner", "Partner") if action == "staff.attendance_mark" else (
+                    "Owner", "Partner", "Accounts")
+            db.execute("UPDATE users SET live_revision=live_revision+1 WHERE active=1 AND role IN ({})".format(
+                ",".join("?" * len(roles))), roles)
+            resource = g.get("activity_resource", request.view_args or {})
+            booking_id = resource.get("booking_id")
+            user_id = resource.get("user_id")
+            worker_actions = {"booking_new", "booking_status", "operations.movement", "changes.review",
+                              "accounts.assign", "accounts.unassign", "accounts.work_update"}
+            if booking_id and action in worker_actions:
+                db.execute(
+                    """UPDATE users SET live_revision=live_revision+1 WHERE role IN ('Staff','Worker')
+                       AND id IN (SELECT user_id FROM work_assignments WHERE booking_id=?)""", (booking_id,))
+            if user_id:
+                db.execute(
+                    "UPDATE users SET live_revision=live_revision+1 WHERE id=? AND role IN ('Staff','Worker')",
+                    (user_id,))
+            worker_ids = resource.get("worker_ids", [])
+            if worker_ids:
+                db.execute(
+                    "UPDATE users SET live_revision=live_revision+1 WHERE id IN ({})".format(
+                        ",".join("?" * len(worker_ids))), worker_ids)
     db.commit()
 
 
@@ -297,8 +348,8 @@ def booked_qty(db, item_id, start, end, exclude_booking=None, statuses=("Booked"
     A delivered booking keeps its items out until it is marked returned, so an overdue
     one blocks stock up to today even though its end date has passed.
     """
-    expression = {"reserved": "bi.qty-bi.returned_qty",
-                  "out": "bi.dispatched_qty-bi.returned_qty",
+    expression = {"reserved": "bi.qty-bi.returned_qty-bi.lost_qty",
+                  "out": "bi.dispatched_qty-bi.returned_qty-bi.lost_qty",
                   "pending": "bi.qty-bi.dispatched_qty"}[quantity]
     rows = db.execute(
         """SELECT b.start_date, b.end_date, b.status,
@@ -403,6 +454,7 @@ def booking_totals(db, booking_id):
     net_paid = paid - refunded
     return {
         "days": days, "lines": lines, "damages": damages, "rent": rent,
+        "lost_qty": sum(line["lost_qty"] for line in lines),
         "discount": b["discount"], "net_rent": net_rent, "deposit": deposit,
         "damage": damage, "travel": travel, "labour": labour, "charges": charges, "total": total, "paid": paid,
         "refunded": refunded, "net_paid": net_paid, "deposit_returned": returned, "cancelled": cancelled, "cancel_fee": b["cancel_fee"],
