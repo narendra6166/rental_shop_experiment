@@ -1,16 +1,33 @@
 {% extends "base.html" %}
 {% from "_macros.html" import booking_card, empty %}
 {% block hero %}
-<header class="hero tall"><div class="wrap">
+<header class="hero tall event-hero"><div class="wrap">
   <div class="top">
     <div class="grow">
       <small>📅 {{ today()|ldate('%A, %d %B') }}</small>
       <div class="title">{{ _(shop_name) }}</div>
     </div>
     <a class="circle" href="{{ url_for('language') }}" title="{{ _('Language') }}">🌐</a>
-    <a class="circle" href="{{ url_for('more') }}">☰</a>
+    <a class="circle" href="{{ url_for('more') }}" aria-label="{{ _('More') }}">☰</a>
   </div>
-  <div class="big">{{ _('Everything for your event.') }}</div>
+  <div class="event-hero-content">
+    <div class="big">{{ _('Everything for your event.') }}</div>
+    <div class="event-art" aria-hidden="true">
+      <svg viewBox="0 0 220 170" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="110" cy="86" r="73" fill="#F8E8C3" fill-opacity=".08"/>
+        <circle cx="110" cy="86" r="60" stroke="#E8C987" stroke-opacity=".45"/>
+        <path d="M37 69 Q110 14 183 69" stroke="#E8C987" stroke-width="2"/>
+        <path d="M39 69 L110 34 L181 69 L169 77 L154 69 L140 77 L125 69 L110 77 L95 69 L80 77 L66 69 L51 77 Z" fill="#D9B675"/>
+        <path d="M54 77 V136 M166 77 V136" stroke="#E8C987" stroke-width="3"/>
+        <path d="M63 136 V104 Q110 48 157 104 V136" fill="#F8E8C3" fill-opacity=".12" stroke="#E8C987" stroke-width="2"/>
+        <path d="M110 87 V136 M85 136 V114 Q110 91 135 114 V136" stroke="#F2D9A2" stroke-opacity=".8" stroke-width="2"/>
+        <path d="M48 137 H172" stroke="#E8C987" stroke-width="3" stroke-linecap="round"/>
+        <path d="M110 21 V34 M102 24 H118" stroke="#F2D9A2" stroke-width="2" stroke-linecap="round"/>
+        <path d="M31 30 V42 M25 36 H37 M184 28 V40 M178 34 H190 M190 99 V107 M186 103 H194" stroke="#F2D9A2" stroke-width="2" stroke-linecap="round"/>
+        <circle cx="48" cy="105" r="2" fill="#F2D9A2"/><circle cx="174" cy="115" r="2" fill="#F2D9A2"/>
+      </svg>
+    </div>
+  </div>
 </div></header>
 <div class="wrap">
   <form class="search" action="{{ url_for('bookings') }}">
@@ -20,7 +37,7 @@
 </div>
 {% endblock %}
 {% block content %}
-<a class="card row between" href="{{ url_for('operations.daily') }}"><strong>{{ _('Daily operations') }}</strong><span>›</span></a>
+<a class="card row between daily-link" href="{{ url_for('operations.daily') }}"><strong>{{ _('Daily operations') }}</strong><span aria-hidden="true">›</span></a>
 <div class="tiles">
   <a class="tile big t-peach" href="{{ url_for('bookings', tab='soon') }}">
     <div>{{ _('Bookings') }}<div class="count">{{ _('{n} starting soon', n=stats.soon) }}</div></div><span class="emoji">🎪</span></a>

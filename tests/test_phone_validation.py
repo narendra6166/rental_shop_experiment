@@ -1,6 +1,7 @@
 import os
 import tempfile
 import unittest
+from html import unescape
 from unittest.mock import patch
 
 from flask.testing import FlaskClient
@@ -166,6 +167,24 @@ class PhoneValidationTests(unittest.TestCase):
                         for label in ("Not a GST tax invoice", "Payment history", "Advance",
                                       "Print / Save PDF", "Tent 10x10 ft"):
                             self.assertIn(str(escape(_(label))), bill)
+
+    def test_shop_brand_is_consistent_across_dashboard_and_invoice_languages(self):
+        response = self.client.post("/bookings/new", data=self.booking_data())
+        booking_id = int(response.headers["Location"].rsplit("/", 1)[-1])
+        brands = {
+            "en": "Amma Event's and Hyres",
+            "te": "అమ్మ ఈవెంట్స్ అండ్ హైర్స్",
+            "hi": "अम्मा इवेंट्स एंड हायर्स",
+        }
+        with patch.dict(self.app.jinja_env.globals, {"shop_name": brands["en"]}):
+            for lang, brand in brands.items():
+                with self.subTest(lang=lang):
+                    self.client.set_cookie("lang", lang)
+                    for path in ("/", f"/bookings/{booking_id}/invoice"):
+                        self.assertIn(brand, unescape(self.client.get(path).get_data(as_text=True)))
+        with patch.dict(self.app.jinja_env.globals, {"shop_name": "Custom shop"}):
+            self.client.set_cookie("lang", "te")
+            self.assertIn("Custom shop", self.client.get("/").get_data(as_text=True))
 
     def test_rental_bill_shows_consistent_totals_and_payment_history(self):
         response = self.client.post("/bookings/new", data=self.booking_data())

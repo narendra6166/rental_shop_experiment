@@ -6,6 +6,7 @@ DEFAULT_LANG = "en"
 
 # English text -> (Telugu, Hindi)
 TR = {
+    "Amma Event's and Hyres": ("అమ్మ ఈవెంట్స్ అండ్ హైర్స్", "अम्मा इवेंट्स एंड हायर्स"),
     "Previous": ("మునుపటి", "पिछला"),
     "Request amendment": ("మార్పు అభ్యర్థించండి", "संशोधन का अनुरोध करें"),
     "Booking change history": ("బుకింగ్ మార్పుల చరిత్ర", "बुकिंग बदलाव का इतिहास"),

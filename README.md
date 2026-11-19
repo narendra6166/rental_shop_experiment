@@ -1,4 +1,4 @@
-# Event Hire Shop
+# Amma Event's and Hyres
 
 Rental management for tents, cooking items, furniture, etc. (marriages, birthdays, parties).
 
@@ -13,6 +13,9 @@ and attach it in WhatsApp. It reflects the current booking and is not an immutab
 Bills and printed PDFs follow the selected English, Telugu or Hindi language, including dates and standard item names.
 Customer details, shop address and custom item names remain as entered.
 Set the shop name, address and phone below to your real business details before sharing bills.
+The default shop name is Amma Event's and Hyres. If `SHOP_NAME` was previously set in your
+environment, it overrides the default; update or unset it and restart the app to change the displayed name.
+The dashboard illustration is decorative, works offline and respects reduced-motion settings.
 Items are grouped on Inventory, Stock and Booking pages into Tents & Event Setup, Cooking & Catering,
 and Pooja & Rituals. Add your actual hot boxes, plates, vessels, mandapams and homam equipment with their stock counts.
 On Stock and New/Edit booking, categories are stacked expandable rows; tap a row to see its items.

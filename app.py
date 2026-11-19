@@ -21,7 +21,7 @@ from filters import date_window
 from operations import operations_bp, record_payment
 from booking_changes import changes_bp
 
-SHOP_NAME = os.environ.get("SHOP_NAME", "Ganesh Hyres")
+SHOP_NAME = os.environ.get("SHOP_NAME", "Amma Event's and Hyres")
 SHOP_ADDRESS = os.environ.get(
     "SHOP_ADDRESS",
     "Near Sri Potti Sreeramulu Bomma, Chennur Road, Buchireddypalem, Nellore, Andhra Pradesh")
