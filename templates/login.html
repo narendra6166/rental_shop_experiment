@@ -5,12 +5,36 @@
 {% block fab %}{% endblock %}
 {% block nav %}{% endblock %}
 {% block content %}
-<form method="post" class="card">
-  {{ csrf_input() }}
-  <label for="user" style="margin-top:0">{{ _('Username') }}</label>
-  <input id="user" name="user" required autofocus autocomplete="username" autocapitalize="none">
-  <label for="password">{{ _('Password') }}</label>
-  <input id="password" type="password" name="password" required autocomplete="current-password">
-  <button class="btn block mt">{{ _('Login') }}</button>
-</form>
+<div class="login-layout">
+  <div class="login-intro">
+    <span class="login-mark" aria-hidden="true">✦</span>
+    <h1>{{ _('Welcome back') }}</h1>
+    <p class="muted">{{ _('Sign in to manage your business.') }}</p>
+  </div>
+  <form method="post" class="card login-card">
+    {{ csrf_input() }}
+    <label for="user" style="margin-top:0">{{ _('Username') }}</label>
+    <input id="user" name="user" required autofocus autocomplete="username" autocapitalize="none" spellcheck="false">
+    <label for="password">{{ _('Password') }}</label>
+    <div class="password-field">
+      <input id="password" type="password" name="password" required autocomplete="current-password">
+      <button class="password-toggle" type="button" aria-controls="password" aria-pressed="false"
+              data-password-toggle data-show="{{ _('Show password') }}" data-hide="{{ _('Hide password') }}" hidden>{{ _('Show password') }}</button>
+    </div>
+    <button class="btn block login-submit">{{ _('Login') }}</button>
+  </form>
+  <div class="login-help card">
+    <h2>{{ _('Need help signing in?') }}</h2>
+    <details>
+      <summary>{{ _('Create an account') }}</summary>
+      <p>{{ _('Ask your Owner to sign in and create your account under More > Team accounts. Public signup is disabled.') }}</p>
+    </details>
+    <details>
+      <summary>{{ _('Forgot password?') }}</summary>
+      <p>{{ _('Ask your Owner to reset your password under More > Team accounts. If the Owner cannot sign in, reset it from the server console:') }}</p>
+      <code>python -m flask --app app reset-password</code>
+      <p class="muted">{{ _('Enter the username and a new password when prompted. Existing sessions for that account will be signed out.') }}</p>
+    </details>
+  </div>
+</div>
 {% endblock %}

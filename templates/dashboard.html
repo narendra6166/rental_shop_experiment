@@ -36,12 +36,7 @@
   </form>
 </div>
 {% endblock %}
-{% block fab %}{% endblock %}
 {% block content %}
-<a class="card row between dashboard-booking" href="{{ url_for('booking_new') }}">
-  <span><strong>＋ {{ _('Create booking') }}</strong><span class="muted dashboard-booking-hint">{{ _('Add an event and reserve your items') }}</span></span>
-  <span class="dashboard-booking-arrow" aria-hidden="true">›</span>
-</a>
 <a class="card row between daily-link" href="{{ url_for('operations.daily') }}"><strong>{{ _('Daily operations') }}</strong><span aria-hidden="true">›</span></a>
 <div class="tiles">
   <a class="tile big t-peach" href="{{ url_for('bookings', tab='soon') }}">

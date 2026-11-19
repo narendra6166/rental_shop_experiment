@@ -6,8 +6,16 @@ DEFAULT_LANG = "en"
 
 # English text -> (Telugu, Hindi)
 TR = {
-    "Create booking": ("బుకింగ్ సృష్టించండి", "बुकिंग बनाएँ"),
-    "Add an event and reserve your items": ("వేడుకను జోడించి వస్తువులను రిజర్వ్ చేయండి", "कार्यक्रम जोड़ें और सामान आरक्षित करें"),
+    "Welcome back": ("మళ్లీ స్వాగతం", "वापस स्वागत है"),
+    "Sign in to manage your business.": ("మీ వ్యాపారాన్ని నిర్వహించడానికి లాగిన్ అవ్వండి.", "अपना व्यवसाय संभालने के लिए लॉगिन करें।"),
+    "Show password": ("పాస్‌వర్డ్ చూపించు", "पासवर्ड दिखाएँ"),
+    "Hide password": ("పాస్‌వర్డ్ దాచు", "पासवर्ड छिपाएँ"),
+    "Need help signing in?": ("లాగిన్ అవ్వడానికి సహాయం కావాలా?", "लॉगिन करने में मदद चाहिए?"),
+    "Create an account": ("ఖాతా సృష్టించండి", "खाता बनाएँ"),
+    "Ask your Owner to sign in and create your account under More > Team accounts. Public signup is disabled.": ("యజమానిని లాగిన్ అయి More > టీమ్ ఖాతాల్లో మీ ఖాతాను సృష్టించమని అడగండి. పబ్లిక్ సైన్‌అప్ లేదు.", "मालिक से लॉगिन करके More > टीम खातों में आपका खाता बनाने को कहें। सार्वजनिक साइनअप बंद है।"),
+    "Forgot password?": ("పాస్‌వర్డ్ మర్చిపోయారా?", "पासवर्ड भूल गए?"),
+    "Ask your Owner to reset your password under More > Team accounts. If the Owner cannot sign in, reset it from the server console:": ("More > టీమ్ ఖాతాల్లో మీ పాస్‌వర్డ్ రీసెట్ చేయమని యజమానిని అడగండి. యజమాని లాగిన్ కాలేకపోతే సర్వర్ కన్సోల్‌లో రీసెట్ చేయండి:", "मालिक से More > टीम खातों में पासवर्ड रीसेट करने को कहें। यदि मालिक लॉगिन नहीं कर पा रहे हैं, तो सर्वर कंसोल से रीसेट करें:"),
+    "Enter the username and a new password when prompted. Existing sessions for that account will be signed out.": ("అడిగినప్పుడు వినియోగదారు పేరు, కొత్త పాస్‌వర్డ్ నమోదు చేయండి. ఆ ఖాతాలోని పాత సెషన్లు ముగుస్తాయి.", "पूछे जाने पर उपयोगकर्ता नाम और नया पासवर्ड दर्ज करें। उस खाते के मौजूदा सत्र बंद हो जाएँगे।"),
     "Amma Event's and Hyres": ("అమ్మ ఈవెంట్స్ అండ్ హైర్స్", "अम्मा इवेंट्स एंड हायर्स"),
     "Previous": ("మునుపటి", "पिछला"),
     "Request amendment": ("మార్పు అభ్యర్థించండి", "संशोधन का अनुरोध करें"),

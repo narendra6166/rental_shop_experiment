@@ -93,6 +93,28 @@ class AccountTests(unittest.TestCase):
         self.assertEqual(self.post("/logout").status_code, 302)
         self.assertIn("/login", self.client.get("/accounts").headers["Location"])
 
+    def test_login_help_and_password_control_keep_account_management_private(self):
+        for language, help_label in (("en", "Forgot password?"), ("te", "పాస్‌వర్డ్ మర్చిపోయారా?"),
+                                     ("hi", "पासवर्ड भूल गए?")):
+            with self.subTest(language=language):
+                self.client.set_cookie("lang", language)
+                response = self.client.get("/login")
+                body = response.get_data(as_text=True)
+                self.assertIn(help_label, body)
+                self.assertIn('data-password-toggle', body)
+                self.assertIn('type="password" name="password"', body)
+                self.assertIn("python -m flask --app app reset-password", body)
+        self.assertIn("/login", self.client.get("/accounts/new").headers["Location"])
+        self.assertIn("/login", self.post("/accounts/new", {}).headers["Location"])
+
+    def test_dashboard_uses_original_role_gated_booking_button(self):
+        self.as_role("Owner")
+        body = self.client.get("/").get_data(as_text=True)
+        self.assertIn('class="fab noprint" href="/bookings/new"', body)
+        self.assertNotIn("dashboard-booking", body)
+        self.as_role("Partner")
+        self.assertNotIn('class="fab noprint"', self.client.get("/").get_data(as_text=True))
+
     def test_role_permissions_on_direct_gets_and_posts(self):
         matrix = {
             "Partner": (["/", "/bookings", "/finance", "/items", "/attendance"], ["/accounts", "/backup", "/bookings/new", "/expenses/new"]),

@@ -48,9 +48,6 @@ main { padding-top: 18px; }
 .card + .card, .card + a.card, a.card + .card, a.card + a.card { margin-top: 14px; }
 .daily-link { border: 1px solid #e8decb; background: linear-gradient(110deg, #fff, #f8f1e4); padding: 16px; }
 .daily-link span { font-size: 1.4rem; color: var(--primary); }
-.dashboard-booking { min-height: 68px; align-items: center; padding: 14px 16px; border-color: #e5d7ba; background: linear-gradient(110deg, #fff, #f8f1e4); }
-.dashboard-booking-hint { display: block; margin-top: 3px; }
-.dashboard-booking-arrow { color: var(--primary); font-size: 1.5rem; }
 a.card:active { transform: scale(.99); }
 .section { display: flex; justify-content: space-between; align-items: baseline; margin: 24px 2px 12px; }
 .section h2 { font-size: 1.1rem; }
@@ -127,6 +124,28 @@ a:focus-visible, button:focus-visible { outline: 3px solid #bb8537; outline-offs
 .flash { padding: 12px 14px; border-radius: 14px; margin-bottom: 12px; font-weight: 600; font-size: .92rem; }
 .flash.ok { background: #dff5e7; color: #14653a; } .flash.error { background: #fde3e3; color: #9b2121; }
 
+/* Sign in */
+.login-layout { max-width: 440px; margin: 0 auto; }
+.login-intro { padding: 8px 4px 16px; }
+.login-intro h1 { margin-top: 10px; font-size: 1.65rem; }
+.login-intro p { margin: 6px 0 0; }
+.login-mark { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 14px;
+  background: #f0e2c7; color: #75551b; font-size: 1.5rem; }
+.login-card, .login-help { padding: 20px; }
+.password-field { display: flex; align-items: stretch; position: relative; }
+.password-field input { min-width: 0; min-height: 60px; padding-right: 112px; }
+.password-toggle { position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+  max-width: 100px; border: 0; border-radius: 8px; padding: 8px; background: var(--primary-tint);
+  color: var(--primary-dark); font: inherit; font-size: .75rem; font-weight: 700; cursor: pointer; }
+.password-toggle[hidden] { display: none; }
+.login-submit { margin-top: 20px; }
+.login-help h2 { font-size: 1rem; margin-bottom: 8px; }
+.login-help details { padding: 12px 0; border-top: 1px solid var(--line); }
+.login-help summary { color: var(--primary-dark); font-weight: 700; cursor: pointer; }
+.login-help p { font-size: .9rem; line-height: 1.5; }
+.login-help code { display: block; padding: 10px; border-radius: 8px; background: var(--primary-tint);
+  font-size: .8rem; overflow-wrap: anywhere; }
+
 /* Item rows */
 .item { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
 .item:last-child { border-bottom: 0; }
@@ -189,7 +208,7 @@ table.lines tr.total td { font-weight: 800; border-top: 2px solid var(--ink); }
 .tabbar a.on { color: var(--primary); }
 .tabbar a.on span { background: var(--primary-tint); border-radius: 14px; margin: 0 14px 2px; }
 .fab { position: fixed; right: 18px; bottom: calc(88px + env(safe-area-inset-bottom)); background: var(--accent); color: #2b2205; z-index: 19;
-  padding: 12px 16px; border-radius: 30px; font-weight: 800; box-shadow: 0 5px 14px #c9a22755; }
+  padding: 14px 20px; border-radius: 30px; font-weight: 800; box-shadow: 0 8px 20px #c9a22766; }
 
 .empty { text-align: center; color: var(--muted); padding: 30px 10px; }
 .empty b { display: block; font-size: 2.4rem; }

@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#292e20">
 <title>{% block page_title %}{{ _(shop_name) }}{% endblock %}</title>
-<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-<script src="{{ url_for('static', filename='forms.js') }}" defer></script>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css', v='20261119-login-3') }}">
+<script src="{{ url_for('static', filename='forms.js', v='20261119-login-3') }}" defer></script>
 {% if live_enabled %}<script src="{{ url_for('static', filename='live.js') }}" defer></script>{% endif %}
 </head>
 <body>

@@ -35,6 +35,8 @@ python3 -m venv venv
 Open http://127.0.0.1:5000. The SQLite database (`rental.db`) is created with sample items on first run.
 Login is now required. Create the first Owner with the command above (interactive password prompt,
 minimum 12 characters). There is no public signup and the old shared-login session is no longer accepted.
+The login page includes a show/hide password control and instructions for requesting an Owner-created
+account or resetting a password. It does not expose public account creation or self-service recovery.
 Back up an existing database before upgrading; its bookings, inventory, customers and payroll are preserved.
 If you previously set a shorter `APP_PASSWORD`, replace it with a password of at least 12 characters
 before the first start, or unset it and use `create-owner`.
