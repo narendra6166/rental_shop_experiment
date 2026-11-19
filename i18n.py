@@ -6,6 +6,8 @@ DEFAULT_LANG = "en"
 
 # English text -> (Telugu, Hindi)
 TR = {
+    "Create booking": ("బుకింగ్ సృష్టించండి", "बुकिंग बनाएँ"),
+    "Add an event and reserve your items": ("వేడుకను జోడించి వస్తువులను రిజర్వ్ చేయండి", "कार्यक्रम जोड़ें और सामान आरक्षित करें"),
     "Amma Event's and Hyres": ("అమ్మ ఈవెంట్స్ అండ్ హైర్స్", "अम्मा इवेंट्स एंड हायर्स"),
     "Previous": ("మునుపటి", "पिछला"),
     "Request amendment": ("మార్పు అభ్యర్థించండి", "संशोधन का अनुरोध करें"),
