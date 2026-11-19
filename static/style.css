@@ -40,7 +40,7 @@ h1, h2, h3 { margin: 0; }
 .search button { width: 46px; height: 46px; border-radius: 50%; border: 0; background: var(--primary); color: #fff;
   font-size: 1.1rem; }
 
-main { padding-top: 18px; }
+main.wrap { padding-top: 18px; }
 
 /* Cards & tiles */
 .card { background: var(--card); border: 1px solid #eae5da; border-radius: 16px; padding: 14px; margin-bottom: 14px;
@@ -70,6 +70,8 @@ a.card:active { transform: scale(.99); }
 .stat b { font-size: 1.6rem; display: block; }
 .stat span { color: var(--muted); font-size: .85rem; }
 .stat.hl { background: var(--primary); color: #fff; } .stat.hl span { color: #ffffffb0; }
+.dashboard-stats { margin-top: 16px; }
+.dashboard-stats .stat { overflow-wrap: anywhere; }
 
 .row { display: flex; align-items: center; gap: 10px; }
 .between { justify-content: space-between; }
@@ -125,6 +127,7 @@ a:focus-visible, button:focus-visible { outline: 3px solid #bb8537; outline-offs
 .flash.ok { background: #dff5e7; color: #14653a; } .flash.error { background: #fde3e3; color: #9b2121; }
 
 /* Sign in */
+.login-page { padding-bottom: 24px; }
 .login-layout { max-width: 440px; margin: 0 auto; }
 .login-intro { padding: 8px 4px 16px; }
 .login-intro h1 { margin-top: 10px; font-size: 1.65rem; }
@@ -143,8 +146,6 @@ a:focus-visible, button:focus-visible { outline: 3px solid #bb8537; outline-offs
 .login-help details { padding: 12px 0; border-top: 1px solid var(--line); }
 .login-help summary { color: var(--primary-dark); font-weight: 700; cursor: pointer; }
 .login-help p { font-size: .9rem; line-height: 1.5; }
-.login-help code { display: block; padding: 10px; border-radius: 8px; background: var(--primary-tint);
-  font-size: .8rem; overflow-wrap: anywhere; }
 
 /* Item rows */
 .item { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
@@ -219,6 +220,22 @@ table.lines tr.total td { font-weight: 800; border-top: 2px solid var(--ink); }
   .tile.small { padding: 10px 8px; font-size: .85rem; overflow-wrap: anywhere; }
   .tile.small .count { font-size: .75rem; }
   .tile.small .emoji { font-size: 2.4rem; }
+}
+
+@media screen and (min-width: 900px) {
+  .wrap { max-width: 1160px; padding-inline: 32px; }
+  main.wrap { padding-top: 24px; }
+  .login-layout { max-width: 900px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 48px; align-items: start; padding-top: clamp(24px, 7vh, 64px); }
+  .login-intro { padding-top: 24px; }
+  .login-intro h1 { font-size: 2.5rem; }
+  .login-card, .login-help { padding: 24px; }
+  .event-hero-content { justify-content: space-between; }
+  .event-hero .big { max-width: 540px; }
+  .dashboard-tiles { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .dashboard-tiles .tile { grid-column: auto; min-height: 150px; overflow-wrap: anywhere; }
+  .dashboard-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .dashboard-bookings { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
 }
 
 @media print {
